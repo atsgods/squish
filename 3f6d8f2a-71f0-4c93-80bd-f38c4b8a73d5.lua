@@ -1,4 +1,4 @@
--- blazzed | Trident Survival V5 - Ключ: atsgey (финальная версия)
+-- blazzed | Trident Survival V5 - Ключ: atsgey (кнопка по центру)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
@@ -23,14 +23,14 @@ pcall(function()
     setreadonly(mt, true)
 end)
 
--- ========== КЛЮЧЕВАЯ ЗАЩИТА (исправлено сообщение об ошибке) ==========
+-- ========== КЛЮЧЕВАЯ ЗАЩИТА ==========
 local inputString = ""
 local waitingForKey = true
 
--- Фон
+-- Фон (увеличен до 220)
 local bg = Drawing.new("Square")
-bg.Size = Vector2.new(400, 200)
-bg.Position = Vector2.new((Camera.ViewportSize.X - 400) / 2, (Camera.ViewportSize.Y - 200) / 2)
+bg.Size = Vector2.new(400, 220)
+bg.Position = Vector2.new((Camera.ViewportSize.X - 400) / 2, (Camera.ViewportSize.Y - 220) / 2)
 bg.Color = Color3.fromRGB(20, 20, 30)
 bg.Filled = true
 bg.Thickness = 0
@@ -46,7 +46,7 @@ title.Center = true
 title.Outline = true
 title.Visible = true
 
--- Поле ввода (фон)
+-- Поле ввода
 local inputFieldBg = Drawing.new("Square")
 inputFieldBg.Size = Vector2.new(300, 40)
 inputFieldBg.Position = Vector2.new(bg.Position.X + 50, bg.Position.Y + 70)
@@ -55,7 +55,6 @@ inputFieldBg.Filled = true
 inputFieldBg.Thickness = 1
 inputFieldBg.Visible = true
 
--- Текст в поле
 local inputText = Drawing.new("Text")
 inputText.Text = ""
 inputText.Size = 18
@@ -65,10 +64,10 @@ inputText.Center = false
 inputText.Outline = false
 inputText.Visible = true
 
--- Кнопка "Войти" (центрированная)
+-- Кнопка "Войти" (центрирована по вертикали и горизонтали)
 local buttonBg = Drawing.new("Square")
 buttonBg.Size = Vector2.new(140, 40)
-buttonBg.Position = Vector2.new(bg.Position.X + (400 - 140) / 2, bg.Position.Y + 130)
+buttonBg.Position = Vector2.new(bg.Position.X + (400 - 140) / 2, bg.Position.Y + 135) -- сместил выше
 buttonBg.Color = Color3.fromRGB(0, 120, 255)
 buttonBg.Filled = true
 buttonBg.Thickness = 0
@@ -83,27 +82,27 @@ buttonText.Center = true
 buttonText.Outline = false
 buttonText.Visible = true
 
--- Сообщение об ошибке (ТОЛЬКО "Неверный ключ!")
+-- Сообщение об ошибке
 local errorMsg = Drawing.new("Text")
 errorMsg.Text = ""
 errorMsg.Size = 14
 errorMsg.Color = Color3.fromRGB(255, 80, 80)
-errorMsg.Position = Vector2.new(bg.Position.X + 200, bg.Position.Y + 185)
+errorMsg.Position = Vector2.new(bg.Position.X + 200, bg.Position.Y + 195)
 errorMsg.Center = true
 errorMsg.Visible = true
 
--- Обновление позиций
+-- Обновление позиций при изменении размера окна
 Camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
-    bg.Position = Vector2.new((Camera.ViewportSize.X - 400) / 2, (Camera.ViewportSize.Y - 200) / 2)
+    bg.Position = Vector2.new((Camera.ViewportSize.X - 400) / 2, (Camera.ViewportSize.Y - 220) / 2)
     title.Position = Vector2.new(bg.Position.X + 200, bg.Position.Y + 30)
     inputFieldBg.Position = Vector2.new(bg.Position.X + 50, bg.Position.Y + 70)
     inputText.Position = Vector2.new(inputFieldBg.Position.X + 10, inputFieldBg.Position.Y + 8)
-    buttonBg.Position = Vector2.new(bg.Position.X + (400 - 140) / 2, bg.Position.Y + 130)
+    buttonBg.Position = Vector2.new(bg.Position.X + (400 - 140) / 2, bg.Position.Y + 135)
     buttonText.Position = Vector2.new(buttonBg.Position.X + 70, buttonBg.Position.Y + 20)
-    errorMsg.Position = Vector2.new(bg.Position.X + 200, bg.Position.Y + 185)
+    errorMsg.Position = Vector2.new(bg.Position.X + 200, bg.Position.Y + 195)
 end)
 
--- Функция проверки ключа
+-- Проверка ключа
 local function checkKey()
     if inputString == "atsgey" then
         waitingForKey = false
@@ -120,7 +119,7 @@ local function checkKey()
     end
 end
 
--- Обработка ввода
+-- Ввод с клавиатуры и мыши
 local function onInput(input, gameProcessed)
     if gameProcessed then return end
     if not waitingForKey then return end
@@ -151,7 +150,7 @@ end
 UIS.InputBegan:Connect(onInput)
 repeat task.wait() until not waitingForKey
 
--- ========== ОСНОВНАЯ ЧАСТЬ (ESP, CHAMS, XRAY, FREECAM) ==========
+-- ========== ОСНОВНОЙ СКРИПТ (ESP, CHAMS, XRAY, FREECAM) ==========
 local Menu = { Open = false }
 local MenuTitle = Drawing.new("Text")
 MenuTitle.Position = Vector2.new(20,40)
@@ -215,7 +214,7 @@ local LastESPUpdate = 0
 local ESP_UPDATE_INTERVAL = 0.033
 local FreecamPos = Camera.CFrame.Position
 
--- Определение оружия
+-- Weapon detection
 local WeaponCache = setmetatable({}, {__mode = "k"})
 local WeaponTimeCache = setmetatable({}, {__mode = "k"})
 local WeaponParts = {
