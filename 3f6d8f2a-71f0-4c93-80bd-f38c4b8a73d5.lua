@@ -17,7 +17,7 @@ pcall(function()
         local method = getnamecallmethod()
         if method == "FireServer" or method == "InvokeServer" then
             local arg = tostring(select(1, ...))
-            if arg:find("Ban") or arg:find("Kick") or arg:find("Detect") or arg:find("Report") then return end
+            if arg:find("Ban") or arg:find("Kick") or arg:find("Detect") then return end
         end
         if method == "Kick" then return end
         return old(self, ...)
@@ -72,21 +72,20 @@ local Settings = {
     Freecam = {Enabled = false, Speed = 100}
 }
 
--- ==================== PLAYER ESP (Full) ====================
+-- ==================== PLAYER ESP ====================
 local PlayerESPData = {}
-
-local weaponNames = {"AR15","M4A1","SCAR","SVD","AK","Bow","CrossBow","UZI","Magnum"} -- можно дополнить
 
 local function GetWeapon(model)
     local hand = model:FindFirstChild("HandModel")
     if not hand then return "None" end
-    for _, name in ipairs(weaponNames) do
-        if hand:FindFirstChild(name, true) then return name end
+    local weapons = {"AR15","M4A1","SCAR","SVD","Bow","CrossBow","UZI","Magnum","PumpShotgun","EnergyRifle"}
+    for _, w in ipairs(weapons) do
+        if hand:FindFirstChild(w, true) then return w end
     end
     return "Unknown"
 end
 
-local function CreateFullESP(plr)
+local function CreatePlayerESP(plr)
     if PlayerESPData[plr] then return end
     local box = Drawing.new("Square"); box.Thickness=1.5; box.Color=Color3.fromRGB(0,255,100); box.Filled=false; box.Visible=false
     local name = Drawing.new("Text"); name.Size=14; name.Color=Color3.fromRGB(255,255,255); name.Outline=true; name.Center=true; name.Visible=false
@@ -102,21 +101,34 @@ local OreData = {}
 local function CreateOreESP(model, oreType)
     if OreData[model] then return end
     local t = Drawing.new("Text")
-    t.Size = 14
-    t.Outline = true
-    t.Center = true
-    t.Visible = false
-    if oreType == "Iron" then t.Color = Color3.fromRGB(255,215,0)
-    elseif oreType == "Nitrate" then t.Color = Color3.fromRGB(100,255,150)
-    else t.Color = Color3.fromRGB(200,200,200) end
-    OreData[model] = {Text=t, Type=oreType}
+    t.Size = 14; t.Outline = true; t.Center = true; t.Visible = false
+    t.Color = oreType == "Iron" and Color3.fromRGB(255,215,0) or oreType == "Nitrate" and Color3.fromRGB(100,255,150) or Color3.fromRGB(200,200,200)
+    OreData[model] = {Text = t, Type = oreType}
 end
 
 -- ==================== CHAMS ====================
 local Chams = {}
 
+-- ==================== XRAY ====================
+local XrayCache = {}
+
+local function ApplyXray(state)
+    for _, part in ipairs(workspace:GetDescendants()) do
+        if part:IsA("BasePart") then
+            local m = part.Material
+            if m == Enum.Material.Cobblestone or m == Enum.Material.Concrete or m == Enum.Material.Brick or m == Enum.Material.WoodPlanks then
+                if not XrayCache[part] then XrayCache[part] = part.Transparency end
+                part.Transparency = state and Settings.Xray.Trans or XrayCache[part]
+            end
+        end
+    end
+end
+
+-- ==================== FREECAM ====================
+local FreecamPos = Camera.CFrame.Position
+
 -- ==================== MAIN LOOP ====================
-RunService.RenderStepped:Connect(function()
+RunService.RenderStepped:Connect(function(dt)
     -- Player ESP
     if Settings.PlayerESP.Enabled then
         for _, plr in ipairs(Players:GetPlayers()) do
@@ -124,7 +136,7 @@ RunService.RenderStepped:Connect(function()
             local root = plr.Character:FindFirstChild("HumanoidRootPart")
             if not root then continue end
 
-            CreateFullESP(plr)
+            CreatePlayerESP(plr)
             local d = PlayerESPData[plr]
 
             local top = Camera:WorldToViewportPoint(root.Position + Vector3.new(0,3,0))
@@ -145,15 +157,12 @@ RunService.RenderStepped:Connect(function()
             d.Dist.Visible = true
 
             d.Weap.Text = GetWeapon(plr.Character)
-            d.Weap.Position = Vector2.new(top.X, bot.Y + 20)
+            d.Weap.Position = Vector2.new(top.X, bot.Y + 22)
             d.Weap.Visible = true
         end
     else
-        for _, data in pairs(PlayerESPData) do
-            data.Box.Visible = false
-            data.Name.Visible = false
-            data.Dist.Visible = false
-            data.Weap.Visible = false
+        for _, d in pairs(PlayerESPData) do
+            d.Box.Visible = false; d.Name.Visible = false; d.Dist.Visible = false; d.Weap.Visible = false
         end
     end
 
@@ -163,17 +172,18 @@ RunService.RenderStepped:Connect(function()
             if model:IsA("Model") then
                 local mp = model:FindFirstChildOfClass("MeshPart")
                 if mp then
+                    local color = mp.Color
                     local oreType = nil
-                    if mp.Color == Color3.fromRGB(72,72,72) then oreType = "Stone"
-                    elseif mp.Color == Color3.fromRGB(199,172,120) or mp.Color == Color3.fromRGB(255,215,0) then oreType = "Iron"
-                    elseif mp.Color == Color3.fromRGB(248,248,248) then oreType = "Nitrate" end
+                    if color == Color3.fromRGB(72,72,72) then oreType = "Stone"
+                    elseif color == Color3.fromRGB(199,172,120) or color == Color3.fromRGB(255,215,0) then oreType = "Iron"
+                    elseif color == Color3.fromRGB(248,248,248) then oreType = "Nitrate" end
 
                     if oreType then
                         CreateOreESP(model, oreType)
                         local data = OreData[model]
-                        local pos, on = Camera:WorldToViewportPoint(mp.Position)
-                        if on then
-                            data.Text.Position = Vector2.new(pos.X, pos.Y)
+                        local pos, onScreen = Camera:WorldToViewportPoint(mp.Position)
+                        if onScreen then
+                            data.Text.Position = Vector2.new(pos.X, pos.Y - 5)
                             data.Text.Visible = true
                         else
                             data.Text.Visible = false
@@ -189,22 +199,34 @@ RunService.RenderStepped:Connect(function()
     -- Chams
     if Settings.Chams.Enabled then
         for _, model in ipairs(workspace:GetChildren()) do
-            if model:IsA("Model") and model:FindFirstChild("HumanoidRootPart") then
-                if not Chams[model] then
-                    local hl = Instance.new("Highlight")
-                    hl.FillTransparency = 0.7
-                    hl.OutlineTransparency = 0
-                    hl.FillColor = Color3.fromRGB(0, 180, 255)
-                    hl.Parent = model
-                    Chams[model] = hl
-                end
-                Chams[model].Enabled = true
+            if model:IsA("Model") and model:FindFirstChild("HumanoidRootPart") and not Chams[model] then
+                local hl = Instance.new("Highlight")
+                hl.FillTransparency = 0.7
+                hl.OutlineTransparency = 0
+                hl.FillColor = Color3.fromRGB(0, 180, 255)
+                hl.Parent = model
+                Chams[model] = hl
             end
         end
+        for _, hl in pairs(Chams) do hl.Enabled = true end
     else
-        for model, hl in pairs(Chams) do
-            if hl then hl.Enabled = false end
+        for _, hl in pairs(Chams) do hl.Enabled = false end
+    end
+
+    -- Freecam
+    if Settings.Freecam.Enabled then
+        local move = Vector3.new()
+        if UIS:IsKeyDown(Enum.KeyCode.W) then move += Camera.CFrame.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.S) then move -= Camera.CFrame.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.A) then move -= Camera.CFrame.RightVector end
+        if UIS:IsKeyDown(Enum.KeyCode.D) then move += Camera.CFrame.RightVector end
+        if UIS:IsKeyDown(Enum.KeyCode.Space) then move += Vector3.new(0,1,0) end
+        if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then move -= Vector3.new(0,1,0) end
+
+        if move.Magnitude > 0 then
+            FreecamPos = FreecamPos + (move.Unit * Settings.Freecam.Speed * dt)
         end
+        Camera.CFrame = CFrame.new(FreecamPos, FreecamPos + Camera.CFrame.LookVector)
     end
 end)
 
@@ -214,21 +236,19 @@ UIS.InputBegan:Connect(function(inp)
 
     if inp.KeyCode == Enum.KeyCode.F1 then
         Settings.PlayerESP.Enabled = not Settings.PlayerESP.Enabled
-        Toggles.PlayerESP.Text = (Settings.PlayerESP.Enabled and "[✔] " or "[ ] ") .. "Player ESP"
+        Toggles.PlayerESP.Text = Settings.PlayerESP.Enabled and "[✔] Player ESP" or "[ ] Player ESP"
     elseif inp.KeyCode == Enum.KeyCode.F2 then
         Settings.OreESP.Enabled = not Settings.OreESP.Enabled
-        Toggles.OreESP.Text = (Settings.OreESP.Enabled and "[✔] " or "[ ] ") .. "Ore ESP"
+        Toggles.OreESP.Text = Settings.OreESP.Enabled and "[✔] Ore ESP" or "[ ] Ore ESP"
     elseif inp.KeyCode == Enum.KeyCode.F3 then
         Settings.Chams.Enabled = not Settings.Chams.Enabled
-        Toggles.Chams.Text = (Settings.Chams.Enabled and "[✔] " or "[ ] ") .. "Chams"
+        Toggles.Chams.Text = Settings.Chams.Enabled and "[✔] Chams" or "[ ] Chams"
     elseif inp.KeyCode == Enum.KeyCode.F4 then
         Settings.Xray.Enabled = not Settings.Xray.Enabled
-        -- ApplyXray() можно добавить позже
-        Toggles.Xray.Text = (Settings.Xray.Enabled and "[✔] " or "[ ] ") .. "Xray"
+        ApplyXray(Settings.Xray.Enabled)
+        Toggles.Xray.Text = Settings.Xray.Enabled and "[✔] Xray" or "[ ] Xray"
     elseif inp.KeyCode == Enum.KeyCode.F5 then
         Settings.Freecam.Enabled = not Settings.Freecam.Enabled
-        Toggles.Freecam.Text = (Settings.Freecam.Enabled and "[✔] " or "[ ] ") .. "Freecam"
+        Toggles.Freecam.Text = Settings.Freecam.Enabled and "[✔] Freecam" or "[ ] Freecam"
     end
 end)
-
-print("blazzed | script initialized") -- этот print можно удалить если хочешь полную тишину
