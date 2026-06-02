@@ -1,4 +1,4 @@
--- blazzed | Trident Survival V5 - Silent & Optimized + Container/Ore ESP Fixed
+-- blazzed | Trident Survival V5 - Silent & Optimized + Container/Ore ESP Fixed v2
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
@@ -83,7 +83,7 @@ local Settings = {
     OreESP = {Enabled = false, MaxDist = 750, TextSize = 12},
 }
 
--- Container типы (настройки цвета и видимости)
+-- Container типы
 local ContainerTypes = {
     Bucket   = { label = "Bucket",   color = Color3.fromRGB(255,165,0),   enabled = true },
     Box      = { label = "Box",      color = Color3.fromRGB(230,182,0),   enabled = true },
@@ -94,11 +94,11 @@ local ContainerTypes = {
     Gas      = { label = "Gasoline", color = Color3.fromRGB(200,0,0),      enabled = true },
 }
 
--- Ore типы
+-- Ore типы (добавим больше цветов и детекцию по имени)
 local OreTypes = {
-    Stone   = { label = "Stone",   color = Color3.fromRGB(120,120,120), enabled = true },
-    Iron    = { label = "Iron",    color = Color3.fromRGB(255,215,0),   enabled = true },
-    Nitrate = { label = "Nitrate", color = Color3.fromRGB(200,255,200), enabled = true },
+    Stone   = { label = "Stone",   color = Color3.fromRGB(120,120,120), enabled = true, names = {"Stone", "Rock"}, colors = {Color3.fromRGB(72,72,72)} },
+    Iron    = { label = "Iron",    color = Color3.fromRGB(255,215,0),   enabled = true, names = {"Iron", "IronOre"}, colors = {Color3.fromRGB(199,172,120)} },
+    Nitrate = { label = "Nitrate", color = Color3.fromRGB(200,255,200), enabled = true, names = {"Nitrate", "Saltpeter"}, colors = {Color3.fromRGB(248,248,248), Color3.fromRGB(255,255,255)} },
 }
 
 -- ========== OPTIMIZED VARIABLES ==========
@@ -114,13 +114,12 @@ local FreecamPos = Camera.CFrame.Position
 -- Container & Ore кеш
 local ContainerData = setmetatable({}, {__mode = "k"})  -- model -> {text, anchor, kind}
 local OreData = setmetatable({}, {__mode = "k"})        -- model -> {text, part, oreType}
-local OreCache = setmetatable({}, {__mode = "k"})       -- model -> {t, p}
 
--- Weapon detection cache (из Goose)
+-- Weapon detection cache
 local WeaponCache = setmetatable({}, {__mode = "k"})
 local WeaponTimeCache = setmetatable({}, {__mode = "k"})
 
--- Таблица оружия и их характерных частей (из Goose)
+-- Таблица оружия
 local WeaponParts = {
     AR15             = {"AnimSaves","Barrel","Body","Bolt","ChargingHandle","Decor","Grip","Mag","Rails","Stock","Muzzle"},
     M4A1             = {"DefaultSight","Body","Bolt","ChargeHandle","Grip","Mag","Metal","mbrk","Muzzle"},
@@ -138,7 +137,6 @@ local WeaponParts = {
 }
 
 -- ========== UTILITIES ==========
--- Улучшенное определение оружия (по Goose)
 local function GetWeapon(model)
     local now = tick()
     local cached = WeaponCache[model]
@@ -221,6 +219,7 @@ function CreateESP(model)
     ESPData[model] = {Box=box, Name=name, Dist=dist, Weap=weap}
 end
 
+-- Очистка при удалении объекта
 game.DescendantRemoving:Connect(function(obj)
     if ESPData[obj] then
         for _, draw in pairs(ESPData[obj]) do
@@ -232,7 +231,6 @@ game.DescendantRemoving:Connect(function(obj)
         ChamsList[obj]:Destroy()
         ChamsList[obj] = nil
     end
-    -- Container / Ore cleanup
     if ContainerData[obj] then
         if ContainerData[obj].text then ContainerData[obj].text:Remove() end
         ContainerData[obj] = nil
@@ -241,7 +239,6 @@ game.DescendantRemoving:Connect(function(obj)
         if OreData[obj].text then OreData[obj].text:Remove() end
         OreData[obj] = nil
     end
-    OreCache[obj] = nil
     WeaponCache[obj] = nil
     WeaponTimeCache[obj] = nil
 end)
@@ -281,7 +278,7 @@ local function UpdateXray()
     LastXrayTrans = Settings.Xray.Trans
 end
 
--- ========== CONTAINER ESP (из Goose) ==========
+-- ========== CONTAINER ESP ==========
 local function DetectContainer(model)
     if not model:IsA("Model") then return false end
     -- Bucket
@@ -338,36 +335,56 @@ local function RemoveContainerESP(model)
     ContainerData[model] = nil
 end
 
--- ========== ORE ESP (из Goose) ==========
-local STONE_C   = Color3.fromRGB(72,72,72)
-local IRON_C1   = Color3.fromRGB(199,172,120)
-local NITRATE_C = Color3.fromRGB(248,248,248)
-
+-- ========== ORE ESP (улучшенная детекция) ==========
 local function DetectOre(model)
-    local cached = OreCache[model]
-    if cached ~= nil then return cached.t, cached.p end
-    local fp = model:FindFirstChildOfClass("MeshPart")
-    if not fp then OreCache[model] = {t=nil,p=nil}; return nil, nil end
-    local parts = {fp}
-    for _, c in ipairs(model:GetChildren()) do
-        if c:IsA("MeshPart") and c ~= fp then
-            table.insert(parts, c)
-            if #parts >= 2 then break end
+    if not model:IsA("Model") then return nil, nil end
+    
+    -- Сначала проверяем по имени модели
+    local modelName = model.Name:lower()
+    for oreType, data in pairs(OreTypes) do
+        for _, name in ipairs(data.names) do
+            if modelName:find(name:lower()) then
+                local anchor = model:FindFirstChildWhichIsA("BasePart") or model.PrimaryPart
+                return oreType, anchor
+            end
         end
     end
-    local oreType, anchorPart
-    if #parts == 1 and fp.Color == STONE_C then
-        oreType, anchorPart = "Stone", fp
-    elseif #parts == 2 then
+    
+    -- Если не нашли по имени, ищем по цвету MeshPart
+    local parts = {}
+    for _, child in ipairs(model:GetChildren()) do
+        if child:IsA("MeshPart") then
+            table.insert(parts, child)
+        end
+    end
+    
+    if #parts == 0 then return nil, nil end
+    
+    -- Проверяем каждый MeshPart на соответствие цветам руд
+    for _, part in ipairs(parts) do
+        local partColor = part.Color
+        for oreType, data in pairs(OreTypes) do
+            for _, color in ipairs(data.colors) do
+                if partColor.R == color.R and partColor.G == color.G and partColor.B == color.B then
+                    return oreType, part
+                end
+            end
+        end
+    end
+    
+    -- Дополнительно: если есть два MeshPart (камень + жила)
+    if #parts >= 2 then
         local c1, c2 = parts[1].Color, parts[2].Color
-        if (c1 == STONE_C and c2 == IRON_C1) or (c2 == STONE_C and c1 == IRON_C1) then
-            oreType, anchorPart = "Iron", parts[1]
-        elseif (c1 == NITRATE_C and c2 == STONE_C) or (c2 == NITRATE_C and c1 == STONE_C) then
-            oreType, anchorPart = "Nitrate", parts[1]
+        for oreType, data in pairs(OreTypes) do
+            for _, col in ipairs(data.colors) do
+                if (c1 == col and c2 == OreTypes.Stone.colors[1]) or (c2 == col and c1 == OreTypes.Stone.colors[1]) then
+                    return oreType, parts[1]
+                end
+            end
         end
     end
-    OreCache[model] = {t=oreType, p=anchorPart}
-    return oreType, anchorPart
+    
+    return nil, nil
 end
 
 local function AddOreESP(model)
@@ -375,7 +392,7 @@ local function AddOreESP(model)
     local oreType, part = DetectOre(model)
     if not oreType or not part then return end
     local text = Drawing.new("Text")
-    text.Text = oreType
+    text.Text = OreTypes[oreType].label
     text.Size = Settings.OreESP.TextSize
     text.Center = true
     text.Font = 2
@@ -390,10 +407,9 @@ local function RemoveOreESP(model)
     local data = OreData[model]
     if data and data.text then data.text:Remove() end
     OreData[model] = nil
-    OreCache[model] = nil
 end
 
--- ========== СКАНИРОВАНИЕ МИРА ДЛЯ КОНТЕЙНЕРОВ И РУД ==========
+-- ========== СКАНИРОВАНИЕ МИРА ==========
 local function ScanWorld()
     for _, obj in ipairs(workspace:GetChildren()) do
         if obj:IsA("Model") then
@@ -533,7 +549,7 @@ RunService.RenderStepped:Connect(function(dt)
         Camera.CFrame = CFrame.new(FreecamPos, FreecamPos + Camera.CFrame.LookVector)
     end
     
-    -- ===== CONTAINER ESP (с принудительным скрытием при отключении) =====
+    -- CONTAINER ESP (с гарантированным скрытием при выключении)
     if Settings.ContainerESP.Enabled then
         local maxDistSq = Settings.ContainerESP.MaxDist ^ 2
         local camPos = Camera.CFrame.Position
@@ -568,13 +584,13 @@ RunService.RenderStepped:Connect(function(dt)
             end
         end
     else
-        -- Принудительно скрываем все тексты контейнеров
+        -- Принудительное скрытие всех текстов контейнеров
         for _, data in pairs(ContainerData) do
             if data and data.text then data.text.Visible = false end
         end
     end
     
-    -- ===== ORE ESP (с принудительным скрытием при отключении) =====
+    -- ORE ESP (с гарантированным скрытием)
     if Settings.OreESP.Enabled then
         local maxDistSq = Settings.OreESP.MaxDist ^ 2
         local camPos = Camera.CFrame.Position
@@ -604,7 +620,7 @@ RunService.RenderStepped:Connect(function(dt)
             end
         end
     else
-        -- Принудительно скрываем все тексты руд
+        -- Принудительное скрытие всех текстов руд
         for _, data in pairs(OreData) do
             if data and data.text then data.text.Visible = false end
         end
@@ -633,7 +649,6 @@ UIS.InputBegan:Connect(function(inp)
     elseif inp.KeyCode == Enum.KeyCode.F5 then
         Settings.ContainerESP.Enabled = not Settings.ContainerESP.Enabled
         Toggles.ContainerESP.Text = Settings.ContainerESP.Enabled and "[✔] Container ESP" or "[ ] Container ESP"
-        -- Принудительно обновляем видимость
         if not Settings.ContainerESP.Enabled then
             for _, data in pairs(ContainerData) do
                 if data and data.text then data.text.Visible = false end
