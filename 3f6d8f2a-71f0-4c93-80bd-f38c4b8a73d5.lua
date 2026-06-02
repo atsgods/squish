@@ -52,7 +52,7 @@ local function ShowKeyGUI()
     title.Font = Enum.Font.GothamBold
     title.Parent = frame
 
-    local textBox = Instance.new("TextBox")
+    local textBox = Instance.new("")
     textBox.Size = UDim2.new(0.8, 0, 0, 40)
     textBox.Position = UDim2.new(0.1, 0, 0.4, 0)
     textBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
