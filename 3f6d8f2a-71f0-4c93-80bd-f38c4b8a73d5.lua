@@ -1,4 +1,4 @@
--- blazzed | Trident Survival V5 - Ключ: atsgey (Drawing Key Check)
+-- blazzed | Trident Survival V5 - Ключ: atsgey (с кнопкой и отображением текста)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
@@ -23,36 +23,39 @@ pcall(function()
     setreadonly(mt, true)
 end)
 
--- ========== KEY CHECK ЧЕРЕЗ DRAWING (исправлен регистр) ==========
+-- ========== КЛЮЧЕВАЯ ЗАЩИТА (DRAWING) ==========
 local inputString = ""
 local waitingForKey = true
 
--- Создаём элементы интерфейса
+-- Фон
 local bg = Drawing.new("Square")
-bg.Size = Vector2.new(400, 150)
-bg.Position = Vector2.new((Camera.ViewportSize.X - 400) / 2, (Camera.ViewportSize.Y - 150) / 2)
+bg.Size = Vector2.new(400, 180)
+bg.Position = Vector2.new((Camera.ViewportSize.X - 400) / 2, (Camera.ViewportSize.Y - 180) / 2)
 bg.Color = Color3.fromRGB(20, 20, 30)
 bg.Filled = true
 bg.Thickness = 0
 bg.Visible = true
 
+-- Заголовок
 local title = Drawing.new("Text")
 title.Text = "Введите ключ доступа"
 title.Size = 20
 title.Color = Color3.fromRGB(255, 255, 255)
-title.Position = Vector2.new(bg.Position.X + 200, bg.Position.Y + 30)
+title.Position = Vector2.new(bg.Position.X + 200, bg.Position.Y + 25)
 title.Center = true
 title.Outline = true
 title.Visible = true
 
+-- Поле ввода (фон)
 local inputFieldBg = Drawing.new("Square")
 inputFieldBg.Size = Vector2.new(300, 40)
-inputFieldBg.Position = Vector2.new(bg.Position.X + 50, bg.Position.Y + 60)
+inputFieldBg.Position = Vector2.new(bg.Position.X + 50, bg.Position.Y + 55)
 inputFieldBg.Color = Color3.fromRGB(50, 50, 60)
 inputFieldBg.Filled = true
 inputFieldBg.Thickness = 1
 inputFieldBg.Visible = true
 
+-- Текст в поле
 local inputText = Drawing.new("Text")
 inputText.Text = ""
 inputText.Size = 18
@@ -62,81 +65,103 @@ inputText.Center = false
 inputText.Outline = false
 inputText.Visible = true
 
+-- Кнопка "Войти"
+local buttonBg = Drawing.new("Square")
+buttonBg.Size = Vector2.new(120, 35)
+buttonBg.Position = Vector2.new(bg.Position.X + 140, bg.Position.Y + 110)
+buttonBg.Color = Color3.fromRGB(0, 120, 255)
+buttonBg.Filled = true
+buttonBg.Thickness = 0
+buttonBg.Visible = true
+
+local buttonText = Drawing.new("Text")
+buttonText.Text = "Войти"
+buttonText.Size = 16
+buttonText.Color = Color3.fromRGB(255, 255, 255)
+buttonText.Position = Vector2.new(buttonBg.Position.X + 60, buttonBg.Position.Y + 17)
+buttonText.Center = true
+buttonText.Outline = false
+buttonText.Visible = true
+
+-- Сообщение об ошибке
 local errorMsg = Drawing.new("Text")
 errorMsg.Text = ""
-errorMsg.Size = 14
+errorMsg.Size = 13
 errorMsg.Color = Color3.fromRGB(255, 80, 80)
-errorMsg.Position = Vector2.new(bg.Position.X + 200, bg.Position.Y + 115)
+errorMsg.Position = Vector2.new(bg.Position.X + 200, bg.Position.Y + 160)
 errorMsg.Center = true
 errorMsg.Visible = true
 
 -- Обновление позиций при изменении размера окна
 Camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
-    bg.Position = Vector2.new((Camera.ViewportSize.X - 400) / 2, (Camera.ViewportSize.Y - 150) / 2)
-    title.Position = Vector2.new(bg.Position.X + 200, bg.Position.Y + 30)
-    inputFieldBg.Position = Vector2.new(bg.Position.X + 50, bg.Position.Y + 60)
+    bg.Position = Vector2.new((Camera.ViewportSize.X - 400) / 2, (Camera.ViewportSize.Y - 180) / 2)
+    title.Position = Vector2.new(bg.Position.X + 200, bg.Position.Y + 25)
+    inputFieldBg.Position = Vector2.new(bg.Position.X + 50, bg.Position.Y + 55)
     inputText.Position = Vector2.new(inputFieldBg.Position.X + 10, inputFieldBg.Position.Y + 8)
-    errorMsg.Position = Vector2.new(bg.Position.X + 200, bg.Position.Y + 115)
+    buttonBg.Position = Vector2.new(bg.Position.X + 140, bg.Position.Y + 110)
+    buttonText.Position = Vector2.new(buttonBg.Position.X + 60, buttonBg.Position.Y + 17)
+    errorMsg.Position = Vector2.new(bg.Position.X + 200, bg.Position.Y + 160)
 end)
 
--- Обработка ввода (исправлен регистр)
+-- Функция проверки ключа
+local function checkKey()
+    if inputString == "atsgey" then
+        waitingForKey = false
+        -- Удаляем все элементы интерфейса
+        for _, obj in pairs({bg, title, inputFieldBg, inputText, buttonBg, buttonText, errorMsg}) do
+            obj.Visible = false
+            obj:Remove()
+        end
+    else
+        errorMsg.Text = "Неверный ключ! Введено: " .. inputString .. ". Ожидается: atsgey"
+        inputString = ""
+        inputText.Text = ""
+        task.wait(2)
+        errorMsg.Text = ""
+    end
+end
+
+-- Обработка ввода с клавиатуры и мыши
 local function onInput(input, gameProcessed)
     if gameProcessed then return end
     if not waitingForKey then return end
-    
+
     if input.UserInputType == Enum.UserInputType.Keyboard then
         local key = input.KeyCode
         if key == Enum.KeyCode.Return or key == Enum.KeyCode.KeypadEnter then
-            if inputString == "atsgey" then
-                waitingForKey = false
-                -- Удаляем элементы
-                bg.Visible = false
-                title.Visible = false
-                inputFieldBg.Visible = false
-                inputText.Visible = false
-                errorMsg.Visible = false
-                bg:Remove()
-                title:Remove()
-                inputFieldBg:Remove()
-                inputText:Remove()
-                errorMsg:Remove()
-                return
-            else
-                inputString = ""
-                inputText.Text = ""
-                errorMsg.Text = "Неверный ключ! Попробуйте снова."
-                task.wait(2)
-                errorMsg.Text = ""
-            end
+            checkKey()
         elseif key == Enum.KeyCode.Backspace then
             inputString = inputString:sub(1, -2)
-            inputText.Text = string.rep("*", #inputString)
+            inputText.Text = inputString
         else
             local char = key.Name
-            -- Разрешаем только буквы и цифры, и сразу приводим к нижнему регистру
             if #char == 1 and char:match("[a-zA-Z0-9]") then
                 inputString = inputString .. char:lower()
-                inputText.Text = string.rep("*", #inputString)
+                inputText.Text = inputString
             end
+        end
+    elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
+        local mp = Vector2.new(input.Position.X, input.Position.Y)
+        if mp.X >= buttonBg.Position.X and mp.X <= buttonBg.Position.X + buttonBg.Size.X and
+           mp.Y >= buttonBg.Position.Y and mp.Y <= buttonBg.Position.Y + buttonBg.Size.Y then
+            checkKey()
         end
     end
 end
 
 UIS.InputBegan:Connect(onInput)
 
--- Ждём ввода правильного ключа
+-- Ждём правильного ключа
 repeat task.wait() until not waitingForKey
 
--- ========== ОСНОВНОЙ СКРИПТ (ESP, Chams, Xray, Freecam) ==========
-
--- MENU
+-- ========== ОСНОВНАЯ ЧАСТЬ (ESP, CHAMS, XRAY, FREECAM) ==========
 local Menu = { Open = false }
-local Title = Drawing.new("Text")
-Title.Position = Vector2.new(20,40)
-Title.Text = "blazzed | script"
-Title.Size = 19
-Title.Color = Color3.fromRGB(255,60,60)
-Title.Outline = true
+local MenuTitle = Drawing.new("Text")
+MenuTitle.Position = Vector2.new(20,40)
+MenuTitle.Text = "blazzed | script"
+MenuTitle.Size = 19
+MenuTitle.Color = Color3.fromRGB(255,60,60)
+MenuTitle.Outline = true
 
 local Status = Drawing.new("Text")
 Status.Position = Vector2.new(20,70)
@@ -165,7 +190,7 @@ local Toggles = {
 
 local function UpdateMenu()
     local v = Menu.Open
-    Title.Visible = v
+    MenuTitle.Visible = v
     Status.Visible = v
     for _, t in pairs(Toggles) do t.Visible = v end
 end
@@ -177,7 +202,6 @@ UIS.InputBegan:Connect(function(i)
     end
 end)
 
--- SETTINGS
 local Settings = {
     PlayerESP = {Enabled = false},
     Chams = {Enabled = false},
@@ -185,7 +209,6 @@ local Settings = {
     Freecam = {Enabled = false, Speed = 120}
 }
 
--- VARIABLES
 local ESPData = {}
 local ChamsList = {}
 local XrayCache = {}
@@ -195,7 +218,7 @@ local LastESPUpdate = 0
 local ESP_UPDATE_INTERVAL = 0.033
 local FreecamPos = Camera.CFrame.Position
 
--- Weapon detection
+-- Определение оружия
 local WeaponCache = setmetatable({}, {__mode = "k"})
 local WeaponTimeCache = setmetatable({}, {__mode = "k"})
 local WeaponParts = {
@@ -324,7 +347,7 @@ end
 RunService.RenderStepped:Connect(function(dt)
     local now = tick()
     if Settings.Xray.Enabled ~= LastXrayState or Settings.Xray.Trans ~= LastXrayTrans then UpdateXray() end
-    
+
     if Settings.Chams.Enabled then
         for _, model in ipairs(workspace:GetChildren()) do
             if model:IsA("Model") and model:FindFirstChild("HumanoidRootPart") then
@@ -343,7 +366,7 @@ RunService.RenderStepped:Connect(function(dt)
     else
         for _, hl in pairs(ChamsList) do if hl then hl.Enabled = false end end
     end
-    
+
     if Settings.PlayerESP.Enabled then
         if now - LastESPUpdate >= ESP_UPDATE_INTERVAL or not LastESPUpdate then
             LastESPUpdate = now
@@ -394,7 +417,7 @@ RunService.RenderStepped:Connect(function(dt)
             if data.Weap then data.Weap.Visible = false end
         end
     end
-    
+
     if Settings.Freecam.Enabled then
         local move = Vector3.new()
         if UIS:IsKeyDown(Enum.KeyCode.W) then move += Camera.CFrame.LookVector end
