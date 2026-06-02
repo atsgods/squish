@@ -23,7 +23,7 @@ pcall(function()
     setreadonly(mt, true)
 end)
 
--- ========== KEY CHECK (БЕЗ ТЕКСТА В ПОЛЕ) ==========
+-- ========== KEY CHECK (ПОЛЕ АБСОЛЮТНО ПУСТОЕ) ==========
 local function ShowKeyGUI()
     local gui = Instance.new("ScreenGui")
     gui.Name = "KeyCheckGUI"
@@ -52,14 +52,15 @@ local function ShowKeyGUI()
     title.Font = Enum.Font.GothamBold
     title.Parent = frame
 
-    local textBox = Instance.new("")
+    local textBox = Instance.new("TextBox")
     textBox.Size = UDim2.new(0.8, 0, 0, 40)
     textBox.Position = UDim2.new(0.1, 0, 0.4, 0)
     textBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
     textBox.TextColor3 = Color3.fromRGB(255, 255, 255)
     textBox.TextSize = 16
     textBox.Font = Enum.Font.Gotham
-    textBox.PlaceholderText = ""   -- ПОЛЕ ВВОДА ПУСТОЕ
+    textBox.PlaceholderText = ""   -- Убираем подсказку
+    textBox.Text = ""              -- ОЧИЩАЕМ ТЕКСТ ПОЛЯ (исправление)
     textBox.ClearTextOnFocus = false
     textBox.Parent = frame
 
