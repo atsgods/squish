@@ -1,5 +1,5 @@
 -- blazzed | script | Trident Survival V5
--- Silent Version - Fixed
+-- Silent Version - Fixed & Improved
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -17,7 +17,7 @@ pcall(function()
         local method = getnamecallmethod()
         if method == "FireServer" or method == "InvokeServer" then
             local arg = tostring(select(1, ...))
-            if arg:find("Ban") or arg:find("Kick") or arg:find("Detect") then return end
+            if arg:find("Ban") or arg:find("Kick") or arg:find("Detect") or arg:find("Report") then return end
         end
         if method == "Kick" then return end
         return old(self, ...)
@@ -27,7 +27,6 @@ end)
 
 -- ==================== MENU ====================
 local Menu = { Open = false }
-
 local Title = Drawing.new("Text"); Title.Position = Vector2.new(20,40); Title.Text = "blazzed | script"; Title.Size = 19; Title.Color = Color3.fromRGB(255,60,60); Title.Outline = true
 local Status = Drawing.new("Text"); Status.Position = Vector2.new(20,70); Status.Text = "RightShift - Menu"; Status.Size = 16; Status.Color = Color3.fromRGB(180,180,180); Status.Outline = true
 
@@ -44,9 +43,9 @@ end
 
 local Toggles = {
     PlayerESP = CreateToggle("Player ESP (F1)", 110),
-    Chams     = CreateToggle("Chams (F2)", 130),
-    Xray      = CreateToggle("Xray (F3)", 150),
-    Freecam   = CreateToggle("Freecam (F4)", 170),
+    Chams = CreateToggle("Chams (F2)", 130),
+    Xray = CreateToggle("Xray (F3)", 150),
+    Freecam = CreateToggle("Freecam (F4)", 170),
 }
 
 local function UpdateMenu()
@@ -70,93 +69,123 @@ local Settings = {
     Freecam = {Enabled = false, Speed = 120}
 }
 
--- ==================== PLAYER ESP ====================
-local PlayerESPData = {}
+-- ==================== IMPROVED PLAYER ESP ====================
+local ESPData = {}
 
 local function GetWeapon(model)
     local hand = model:FindFirstChild("HandModel")
     if not hand then return "None" end
-    local list = {"AR15","M4A1","SCAR","SVD","Bow","CrossBow","UZI","Magnum","PumpShotgun","EnergyRifle","GaussRifle"}
-    for _, w in ipairs(list) do
+    local weapons = {"AR15","M4A1","SCAR","SVD","Bow","CrossBow","UZI","Magnum","PumpShotgun","EnergyRifle","GaussRifle","HMAR","LeverActionRifle"}
+    for _, w in ipairs(weapons) do
         if hand:FindFirstChild(w, true) then return w end
     end
     return "Unknown"
 end
 
-local function CreatePlayerESP(plr)
-    if PlayerESPData[plr] then return end
-    local box = Drawing.new("Square"); box.Thickness=1.5; box.Color=Color3.fromRGB(0,255,100); box.Filled=false; box.Visible=false
-    local name = Drawing.new("Text"); name.Size=14; name.Color=Color3.fromRGB(255,255,255); name.Outline=true; name.Center=true; name.Visible=false
-    local dist = Drawing.new("Text"); dist.Size=13; dist.Color=Color3.fromRGB(200,200,200); dist.Outline=true; dist.Center=true; dist.Visible=false
-    local weap = Drawing.new("Text"); weap.Size=13; weap.Color=Color3.fromRGB(255,200,100); weap.Outline=true; weap.Center=true; weap.Visible=false
-
-    PlayerESPData[plr] = {Box=box, Name=name, Dist=dist, Weap=weap}
-end
-
--- ==================== CHAMS ====================
-local Chams = {}
-
--- ==================== XRAY ====================
-local XrayCache = {}
-
-local function ApplyXray(state)
-    for _, part in ipairs(workspace:GetDescendants()) do
-        if part:IsA("BasePart") then
-            local m = part.Material
-            if m == Enum.Material.Cobblestone or m == Enum.Material.Concrete or m == Enum.Material.Brick or m == Enum.Material.WoodPlanks then
-                if not XrayCache[part] then XrayCache[part] = part.Transparency end
-                part.Transparency = state and Settings.Xray.Trans or XrayCache[part]
-            end
-        end
+local function IsSleeper(model)
+    local lt = model:FindFirstChild("LowerTorso")
+    if lt and lt:FindFirstChild("RootRig") then
+        local angle = lt.RootRig.CurrentAngle
+        return typeof(angle) == "number" and angle ~= 0
     end
+    return false
 end
 
--- ==================== FREECAM ====================
-local FreecamPos = Camera.CFrame.Position
+local function CreateESP(model)
+    if ESPData[model] then return end
+    
+    local box = Drawing.new("Square")
+    box.Thickness = 1.8
+    box.Color = Color3.fromRGB(0, 255, 100)
+    box.Filled = false
+    box.Transparency = 1
+    box.Visible = false
+
+    local name = Drawing.new("Text")
+    name.Size = 14
+    name.Color = Color3.fromRGB(255, 255, 255)
+    name.Outline = true
+    name.Center = true
+    name.Visible = false
+
+    local dist = Drawing.new("Text")
+    dist.Size = 13
+    dist.Color = Color3.fromRGB(200, 200, 200)
+    dist.Outline = true
+    dist.Center = true
+    dist.Visible = false
+
+    local weap = Drawing.new("Text")
+    weap.Size = 13
+    weap.Color = Color3.fromRGB(255, 200, 100)
+    weap.Outline = true
+    weap.Center = true
+    weap.Visible = false
+
+    ESPData[model] = {Box = box, Name = name, Dist = dist, Weap = weap}
+end
 
 -- ==================== MAIN LOOP ====================
 RunService.RenderStepped:Connect(function(dt)
     -- Player ESP
     if Settings.PlayerESP.Enabled then
-        for _, plr in ipairs(Players:GetPlayers()) do
-            if plr == Player or not plr.Character then continue end
-            local root = plr.Character:FindFirstChild("HumanoidRootPart")
+        for _, model in ipairs(workspace:GetChildren()) do
+            if not model:IsA("Model") or model == Player.Character then continue end
+            local root = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("LowerTorso")
             if not root then continue end
 
-            CreatePlayerESP(plr)
-            local d = PlayerESPData[plr]
+            -- Пропуск спящих (по желанию можно убрать)
+            if IsSleeper(model) then continue end
 
-            local top = Camera:WorldToViewportPoint(root.Position + Vector3.new(0,3,0))
-            local bot = Camera:WorldToViewportPoint(root.Position - Vector3.new(0,3,0))
-            local h = bot.Y - top.Y
-            local w = h * 0.65
+            CreateESP(model)
+            local data = ESPData[model]
 
-            d.Box.Size = Vector2.new(w, h)
-            d.Box.Position = Vector2.new(top.X - w/2, top.Y)
-            d.Box.Visible = true
+            local top = Camera:WorldToViewportPoint(root.Position + Vector3.new(0, 3.2, 0))
+            local bot = Camera:WorldToViewportPoint(root.Position - Vector3.new(0, 3, 0))
 
-            d.Name.Text = plr.Name
-            d.Name.Position = Vector2.new(top.X, top.Y - 20)
-            d.Name.Visible = true
+            if top.Z < 0 then 
+                data.Box.Visible = false
+                data.Name.Visible = false
+                data.Dist.Visible = false
+                data.Weap.Visible = false
+                continue 
+            end
 
-            d.Dist.Text = math.floor((root.Position - Camera.CFrame.Position).Magnitude) .. "m"
-            d.Dist.Position = Vector2.new(top.X, bot.Y + 5)
-            d.Dist.Visible = true
+            local height = bot.Y - top.Y
+            local width = height * 0.65
 
-            d.Weap.Text = GetWeapon(plr.Character)
-            d.Weap.Position = Vector2.new(top.X, bot.Y + 22)
-            d.Weap.Visible = true
+            -- Box
+            data.Box.Size = Vector2.new(width, height)
+            data.Box.Position = Vector2.new(top.X - width/2, top.Y)
+            data.Box.Visible = true
+
+            -- Name
+            data.Name.Text = model.Name
+            data.Name.Position = Vector2.new(top.X, top.Y - 22)
+            data.Name.Visible = true
+
+            -- Distance
+            local distance = math.floor((root.Position - Camera.CFrame.Position).Magnitude)
+            data.Dist.Text = distance .. "m"
+            data.Dist.Position = Vector2.new(top.X, bot.Y + 6)
+            data.Dist.Visible = true
+
+            -- Weapon
+            data.Weap.Text = GetWeapon(model)
+            data.Weap.Position = Vector2.new(top.X, bot.Y + 24)
+            data.Weap.Visible = true
         end
     else
-        for _, d in pairs(PlayerESPData) do
-            if d.Box then d.Box.Visible = false end
-            if d.Name then d.Name.Visible = false end
-            if d.Dist then d.Dist.Visible = false end
-            if d.Weap then d.Weap.Visible = false end
+        -- Выключаем всё
+        for _, data in pairs(ESPData) do
+            data.Box.Visible = false
+            data.Name.Visible = false
+            data.Dist.Visible = false
+            data.Weap.Visible = false
         end
     end
 
-    -- Chams
+    -- Chams (оставил как было, но можно улучшить)
     if Settings.Chams.Enabled then
         for _, model in ipairs(workspace:GetChildren()) do
             if model:IsA("Model") and model:FindFirstChild("HumanoidRootPart") then
@@ -172,8 +201,8 @@ RunService.RenderStepped:Connect(function(dt)
             end
         end
     else
-        for _, hl in pairs(Chams) do 
-            if hl then hl.Enabled = false end 
+        for _, hl in pairs(Chams) do
+            if hl then hl.Enabled = false end
         end
     end
 
@@ -200,7 +229,6 @@ end)
 -- ==================== KEYBINDS ====================
 UIS.InputBegan:Connect(function(inp)
     if not Menu.Open then return end
-
     if inp.KeyCode == Enum.KeyCode.F1 then
         Settings.PlayerESP.Enabled = not Settings.PlayerESP.Enabled
         Toggles.PlayerESP.Text = Settings.PlayerESP.Enabled and "[✔] Player ESP" or "[ ] Player ESP"
