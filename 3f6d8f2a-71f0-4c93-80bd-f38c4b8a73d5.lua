@@ -1,4 +1,4 @@
--- blazzed | Trident Survival V5 - Silent & Optimized
+-- blazzed | Trident Survival V5 - Silent & Optimized + Freecam fix
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
@@ -80,17 +80,13 @@ local Settings = {
 }
 
 -- ========== OPTIMIZED VARIABLES ==========
-local ESPData = {}      -- model -> drawing objects
-local ChamsList = {}    -- model -> highlight
-local XrayCache = {}    -- part -> original transparency
+local ESPData = {}
+local ChamsList = {}
+local XrayCache = {}
 local LastXrayState = nil
 local LastXrayTrans = nil
-
--- For throttling ESP updates (optional, reduces CPU)
 local LastESPUpdate = 0
-local ESP_UPDATE_INTERVAL = 0.033  -- ~30 fps for ESP, other features can run at 60
-
--- Freecam
+local ESP_UPDATE_INTERVAL = 0.033
 local FreecamPos = Camera.CFrame.Position
 
 -- ========== UTILITIES ==========
@@ -113,7 +109,7 @@ local function IsSleeper(model)
     return false
 end
 
--- ========== ESP (CREATED ONCE) ==========
+-- ========== ESP ==========
 function CreateESP(model)
     if ESPData[model] then return end
     local box = Drawing.new("Square")
@@ -146,7 +142,6 @@ function CreateESP(model)
     ESPData[model] = {Box=box, Name=name, Dist=dist, Weap=weap}
 end
 
--- Cleanup ESP for destroyed models
 game.DescendantRemoving:Connect(function(obj)
     if ESPData[obj] then
         for _, draw in pairs(ESPData[obj]) do
@@ -160,7 +155,7 @@ game.DescendantRemoving:Connect(function(obj)
     end
 end)
 
--- ========== XRAY (APPLY ONCE WHEN NEEDED) ==========
+-- ========== XRAY ==========
 local function ApplyXray(enable, transparency)
     local targetTrans = enable and transparency or nil
     for part, origTrans in pairs(XrayCache) do
@@ -170,12 +165,7 @@ local function ApplyXray(enable, transparency)
             XrayCache[part] = nil
         end
     end
-    if not enable then
-        -- scan for new parts that might have been added while xray off?
-        -- but to avoid lag, we only cache when enabling first time
-        return
-    end
-    -- cache new parts that appeared after enabling
+    if not enable then return end
     for _, part in ipairs(workspace:GetDescendants()) do
         if part:IsA("BasePart") then
             local m = part.Material
@@ -190,7 +180,6 @@ local function ApplyXray(enable, transparency)
     end
 end
 
--- Call this when Xray state or transparency changes
 local function UpdateXray()
     if Settings.Xray.Enabled then
         ApplyXray(true, Settings.Xray.Trans)
@@ -201,16 +190,14 @@ local function UpdateXray()
     LastXrayTrans = Settings.Xray.Trans
 end
 
--- ========== MAIN LOOP (OPTIMIZED) ==========
+-- ========== MAIN LOOP ==========
 RunService.RenderStepped:Connect(function(dt)
     local now = tick()
     
-    -- ===== Xray (update only if changed) =====
     if Settings.Xray.Enabled ~= LastXrayState or Settings.Xray.Trans ~= LastXrayTrans then
         UpdateXray()
     end
     
-    -- ===== Chams (only for existing models, no extra loops) =====
     if Settings.Chams.Enabled then
         for _, model in ipairs(workspace:GetChildren()) do
             if model:IsA("Model") and model:FindFirstChild("HumanoidRootPart") then
@@ -232,11 +219,9 @@ RunService.RenderStepped:Connect(function(dt)
         end
     end
     
-    -- ===== Player ESP (throttled to reduce lag) =====
     if Settings.PlayerESP.Enabled then
         if now - LastESPUpdate >= ESP_UPDATE_INTERVAL or not LastESPUpdate then
             LastESPUpdate = now
-            -- Iterate only through models that have HumanoidRootPart
             for _, model in ipairs(workspace:GetChildren()) do
                 if not model:IsA("Model") or model == Player.Character then continue end
                 local root = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("LowerTorso")
@@ -288,7 +273,6 @@ RunService.RenderStepped:Connect(function(dt)
             end
         end
     else
-        -- Hide all ESP elements
         for _, data in pairs(ESPData) do
             if data.Box then data.Box.Visible = false end
             if data.Name then data.Name.Visible = false end
@@ -297,7 +281,6 @@ RunService.RenderStepped:Connect(function(dt)
         end
     end
     
-    -- ===== Freecam =====
     if Settings.Freecam.Enabled then
         local move = Vector3.new()
         if UIS:IsKeyDown(Enum.KeyCode.W) then move += Camera.CFrame.LookVector end
@@ -314,7 +297,7 @@ RunService.RenderStepped:Connect(function(dt)
     end
 end)
 
--- ========== KEYBINDS ==========
+-- ========== KEYBINDS (FIXED FREECAM RESET) ==========
 UIS.InputBegan:Connect(function(inp)
     if not Menu.Open then return end
     if inp.KeyCode == Enum.KeyCode.F1 then
@@ -330,8 +313,10 @@ UIS.InputBegan:Connect(function(inp)
     elseif inp.KeyCode == Enum.KeyCode.F4 then
         Settings.Freecam.Enabled = not Settings.Freecam.Enabled
         Toggles.Freecam.Text = Settings.Freecam.Enabled and "[✔] Freecam" or "[ ] Freecam"
+        if Settings.Freecam.Enabled then
+            FreecamPos = Camera.CFrame.Position   -- ← фикс: сброс на текущую позицию камеры
+        end
     end
 end)
 
--- Initial Xray state
 UpdateXray()
