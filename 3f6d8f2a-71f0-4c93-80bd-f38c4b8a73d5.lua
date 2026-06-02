@@ -1,5 +1,5 @@
 -- blazzed | script | Trident Survival V5
--- Silent Version
+-- Silent Version - Fixed
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -7,7 +7,7 @@ local UIS = game:GetService("UserInputService")
 local Player = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- ==================== SILENT BYPASS ====================
+-- ==================== BYPASS ====================
 pcall(function()
     hookfunction(game:GetService("Stats").GetMemoryUsageMb, function() return math.random(140, 260) end)
     local mt = getrawmetatable(game)
@@ -69,7 +69,7 @@ local Settings = {
     OreESP = {Enabled = false},
     Chams = {Enabled = false},
     Xray = {Enabled = false, Trans = 0.5},
-    Freecam = {Enabled = false, Speed = 100}
+    Freecam = {Enabled = false, Speed = 120}
 }
 
 -- ==================== PLAYER ESP ====================
@@ -78,9 +78,11 @@ local PlayerESPData = {}
 local function GetWeapon(model)
     local hand = model:FindFirstChild("HandModel")
     if not hand then return "None" end
-    local weapons = {"AR15","M4A1","SCAR","SVD","Bow","CrossBow","UZI","Magnum","PumpShotgun","EnergyRifle"}
-    for _, w in ipairs(weapons) do
-        if hand:FindFirstChild(w, true) then return w end
+    local list = {"AR15","M4A1","SCAR","SVD","Bow","CrossBow","UZI","Magnum","PumpShotgun","EnergyRifle","GaussRifle"}
+    for _, w in ipairs(list) do
+        if hand:FindFirstChild(w, true) or hand:FindFirstChildWhichIsA("MeshPart", true) and hand:FindFirstChild(w) then 
+            return w 
+        end
     end
     return "Unknown"
 end
@@ -112,13 +114,13 @@ local Chams = {}
 -- ==================== XRAY ====================
 local XrayCache = {}
 
-local function ApplyXray(state)
+local function ApplyXray()
     for _, part in ipairs(workspace:GetDescendants()) do
         if part:IsA("BasePart") then
             local m = part.Material
             if m == Enum.Material.Cobblestone or m == Enum.Material.Concrete or m == Enum.Material.Brick or m == Enum.Material.WoodPlanks then
                 if not XrayCache[part] then XrayCache[part] = part.Transparency end
-                part.Transparency = state and Settings.Xray.Trans or XrayCache[part]
+                part.Transparency = Settings.Xray.Enabled and Settings.Xray.Trans or XrayCache[part]
             end
         end
     end
@@ -162,7 +164,10 @@ RunService.RenderStepped:Connect(function(dt)
         end
     else
         for _, d in pairs(PlayerESPData) do
-            d.Box.Visible = false; d.Name.Visible = false; d.Dist.Visible = false; d.Weap.Visible = false
+            if d.Box then d.Box.Visible = false end
+            if d.Name then d.Name.Visible = false end
+            if d.Dist then d.Dist.Visible = false end
+            if d.Weap then d.Weap.Visible = false end
         end
     end
 
@@ -172,18 +177,18 @@ RunService.RenderStepped:Connect(function(dt)
             if model:IsA("Model") then
                 local mp = model:FindFirstChildOfClass("MeshPart")
                 if mp then
-                    local color = mp.Color
+                    local c = mp.Color
                     local oreType = nil
-                    if color == Color3.fromRGB(72,72,72) then oreType = "Stone"
-                    elseif color == Color3.fromRGB(199,172,120) or color == Color3.fromRGB(255,215,0) then oreType = "Iron"
-                    elseif color == Color3.fromRGB(248,248,248) then oreType = "Nitrate" end
+                    if c.R == 72/255 and c.G == 72/255 and c.B == 72/255 then oreType = "Stone"
+                    elseif c.R > 0.75 then oreType = "Iron"
+                    elseif c.G > 0.9 then oreType = "Nitrate" end
 
                     if oreType then
                         CreateOreESP(model, oreType)
                         local data = OreData[model]
                         local pos, onScreen = Camera:WorldToViewportPoint(mp.Position)
-                        if onScreen then
-                            data.Text.Position = Vector2.new(pos.X, pos.Y - 5)
+                        if onScreen and pos.Z > 0 then
+                            data.Text.Position = Vector2.new(pos.X, pos.Y)
                             data.Text.Visible = true
                         else
                             data.Text.Visible = false
@@ -193,24 +198,33 @@ RunService.RenderStepped:Connect(function(dt)
             end
         end
     else
-        for _, data in pairs(OreData) do data.Text.Visible = false end
+        for _, data in pairs(OreData) do 
+            if data.Text then data.Text.Visible = false end 
+        end
     end
 
     -- Chams
     if Settings.Chams.Enabled then
         for _, model in ipairs(workspace:GetChildren()) do
-            if model:IsA("Model") and model:FindFirstChild("HumanoidRootPart") and not Chams[model] then
-                local hl = Instance.new("Highlight")
-                hl.FillTransparency = 0.7
-                hl.OutlineTransparency = 0
-                hl.FillColor = Color3.fromRGB(0, 180, 255)
-                hl.Parent = model
-                Chams[model] = hl
+            if model:IsA("Model") and model:FindFirstChild("HumanoidRootPart") then
+                if not Chams[model] then
+                    local hl = Instance.new("Highlight")
+                    hl.FillTransparency = 0.7
+                    hl.OutlineTransparency = 0
+                    hl.FillColor = Color3.fromRGB(0, 180, 255)
+                    hl.Parent = model
+                    Chams[model] = hl
+                end
+                Chams[model].Enabled = true
             end
         end
-        for _, hl in pairs(Chams) do hl.Enabled = true end
     else
         for _, hl in pairs(Chams) do hl.Enabled = false end
+    end
+
+    -- Xray
+    if Settings.Xray.Enabled then
+        ApplyXray()
     end
 
     -- Freecam
@@ -224,7 +238,7 @@ RunService.RenderStepped:Connect(function(dt)
         if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then move -= Vector3.new(0,1,0) end
 
         if move.Magnitude > 0 then
-            FreecamPos = FreecamPos + (move.Unit * Settings.Freecam.Speed * dt)
+            FreecamPos = FreecamPos + move.Unit * Settings.Freecam.Speed * dt
         end
         Camera.CFrame = CFrame.new(FreecamPos, FreecamPos + Camera.CFrame.LookVector)
     end
@@ -245,7 +259,6 @@ UIS.InputBegan:Connect(function(inp)
         Toggles.Chams.Text = Settings.Chams.Enabled and "[✔] Chams" or "[ ] Chams"
     elseif inp.KeyCode == Enum.KeyCode.F4 then
         Settings.Xray.Enabled = not Settings.Xray.Enabled
-        ApplyXray(Settings.Xray.Enabled)
         Toggles.Xray.Text = Settings.Xray.Enabled and "[✔] Xray" or "[ ] Xray"
     elseif inp.KeyCode == Enum.KeyCode.F5 then
         Settings.Freecam.Enabled = not Settings.Freecam.Enabled
