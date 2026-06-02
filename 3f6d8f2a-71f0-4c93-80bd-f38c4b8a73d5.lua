@@ -23,7 +23,7 @@ pcall(function()
     setreadonly(mt, true)
 end)
 
--- ========== KEY CHECK ==========
+-- ========== KEY CHECK (БЕЗ ТЕКСТА В ПОЛЕ) ==========
 local function ShowKeyGUI()
     local gui = Instance.new("ScreenGui")
     gui.Name = "KeyCheckGUI"
@@ -59,7 +59,7 @@ local function ShowKeyGUI()
     textBox.TextColor3 = Color3.fromRGB(255, 255, 255)
     textBox.TextSize = 16
     textBox.Font = Enum.Font.Gotham
-    textBox.PlaceholderText = "Ключ"
+    textBox.PlaceholderText = ""   -- ПОЛЕ ВВОДА ПУСТОЕ
     textBox.ClearTextOnFocus = false
     textBox.Parent = frame
 
@@ -110,7 +110,7 @@ local function ShowKeyGUI()
     repeat task.wait() until accepted == true
 end
 
-ShowKeyGUI()  -- Ждём ввода правильного ключа
+ShowKeyGUI()
 
 -- ========== MENU ==========
 local Menu = { Open = false }
