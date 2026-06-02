@@ -1,5 +1,5 @@
 -- blazzed | script | Trident Survival V5
--- Silent Version
+-- Silent Version - Fixed
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -178,11 +178,7 @@ RunService.RenderStepped:Connect(function(dt)
     end
 
     -- Xray
-    if Settings.Xray.Enabled then
-        ApplyXray(true)
-    else
-        ApplyXray(false)
-    end
+    ApplyXray(Settings.Xray.Enabled)
 
     -- Freecam
     if Settings.Freecam.Enabled then
