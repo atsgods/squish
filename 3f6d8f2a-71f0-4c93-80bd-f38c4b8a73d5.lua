@@ -86,7 +86,7 @@ local function IsSleeper(model)
     local lt = model:FindFirstChild("LowerTorso")
     if lt and lt:FindFirstChild("RootRig") then
         local angle = lt.RootRig.CurrentAngle
-        return typeof(angle) == "number" and angle ~= 0
+        return typeof(angle) == "number" and math.abs(angle) > 0.1
     end
     return false
 end
@@ -96,7 +96,6 @@ local function CreateESP(model)
     
     local box = Drawing.new("Square")
     box.Thickness = 1.8
-    box.Color = Color3.fromRGB(0, 255, 100)
     box.Filled = false
     box.Transparency = 1
     box.Visible = false
@@ -127,15 +126,12 @@ end
 
 -- ==================== MAIN LOOP ====================
 RunService.RenderStepped:Connect(function(dt)
-    -- Player ESP
     if Settings.PlayerESP.Enabled then
         for _, model in ipairs(workspace:GetChildren()) do
             if not model:IsA("Model") or model == Player.Character then continue end
+            
             local root = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("LowerTorso")
             if not root then continue end
-
-            -- Пропуск спящих (по желанию можно убрать)
-            if IsSleeper(model) then continue end
 
             CreateESP(model)
             local data = ESPData[model]
@@ -153,6 +149,19 @@ RunService.RenderStepped:Connect(function(dt)
 
             local height = bot.Y - top.Y
             local width = height * 0.65
+            local distance = math.floor((root.Position - Camera.CFrame.Position).Magnitude)
+            local isSleeping = IsSleeper(model)
+
+            -- === Цвета ===
+            if isSleeping then
+                data.Box.Color = Color3.fromRGB(255, 100, 100)     -- красный для спящих
+                data.Name.Color = Color3.fromRGB(255, 80, 80)
+                data.Name.Text = model.Name .. " [SLEEP]"
+            else
+                data.Box.Color = Color3.fromRGB(0, 255, 100)       -- зелёный для обычных
+                data.Name.Color = Color3.fromRGB(255, 255, 255)
+                data.Name.Text = model.Name
+            end
 
             -- Box
             data.Box.Size = Vector2.new(width, height)
@@ -160,12 +169,10 @@ RunService.RenderStepped:Connect(function(dt)
             data.Box.Visible = true
 
             -- Name
-            data.Name.Text = model.Name
             data.Name.Position = Vector2.new(top.X, top.Y - 22)
             data.Name.Visible = true
 
             -- Distance
-            local distance = math.floor((root.Position - Camera.CFrame.Position).Magnitude)
             data.Dist.Text = distance .. "m"
             data.Dist.Position = Vector2.new(top.X, bot.Y + 6)
             data.Dist.Visible = true
@@ -176,7 +183,6 @@ RunService.RenderStepped:Connect(function(dt)
             data.Weap.Visible = true
         end
     else
-        -- Выключаем всё
         for _, data in pairs(ESPData) do
             data.Box.Visible = false
             data.Name.Visible = false
@@ -185,7 +191,7 @@ RunService.RenderStepped:Connect(function(dt)
         end
     end
 
-    -- Chams (оставил как было, но можно улучшить)
+    -- Chams
     if Settings.Chams.Enabled then
         for _, model in ipairs(workspace:GetChildren()) do
             if model:IsA("Model") and model:FindFirstChild("HumanoidRootPart") then
@@ -201,9 +207,7 @@ RunService.RenderStepped:Connect(function(dt)
             end
         end
     else
-        for _, hl in pairs(Chams) do
-            if hl then hl.Enabled = false end
-        end
+        for _, hl in pairs(Chams) do if hl then hl.Enabled = false end end
     end
 
     -- Xray
