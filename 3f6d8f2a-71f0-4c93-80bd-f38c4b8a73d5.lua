@@ -1,13 +1,11 @@
--- blazzed | script | Trident Survival V5
--- Optimized Version
-
+-- blazzed | Trident Survival V5 - Silent & Optimized
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
 local Player = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- ==================== SILENT BYPASS ====================
+-- ========== SILENT BYPASS ==========
 pcall(function()
     hookfunction(game:GetService("Stats").GetMemoryUsageMb, function() return math.random(140, 260) end)
     local mt = getrawmetatable(game)
@@ -17,7 +15,7 @@ pcall(function()
         local method = getnamecallmethod()
         if method == "FireServer" or method == "InvokeServer" then
             local arg = tostring(select(1, ...))
-            if arg:find("Ban") or arg:find("Kick") or arg:find("Detect") then return end
+            if arg:find("Ban") or arg:find("Kick") or arg:find("Detect") or arg:find("Report") then return end
         end
         if method == "Kick" then return end
         return old(self, ...)
@@ -25,10 +23,21 @@ pcall(function()
     setreadonly(mt, true)
 end)
 
--- ==================== MENU ====================
+-- ========== MENU ==========
 local Menu = { Open = false }
-local Title = Drawing.new("Text"); Title.Position = Vector2.new(20,40); Title.Text = "blazzed | script"; Title.Size = 19; Title.Color = Color3.fromRGB(255,60,60); Title.Outline = true
-local Status = Drawing.new("Text"); Status.Position = Vector2.new(20,70); Status.Text = "RightShift - Menu"; Status.Size = 16; Status.Color = Color3.fromRGB(180,180,180); Status.Outline = true
+local Title = Drawing.new("Text")
+Title.Position = Vector2.new(20,40)
+Title.Text = "blazzed | script"
+Title.Size = 19
+Title.Color = Color3.fromRGB(255,60,60)
+Title.Outline = true
+
+local Status = Drawing.new("Text")
+Status.Position = Vector2.new(20,70)
+Status.Text = "RightShift - Menu"
+Status.Size = 16
+Status.Color = Color3.fromRGB(180,180,180)
+Status.Outline = true
 
 local function CreateToggle(text, y)
     local t = Drawing.new("Text")
@@ -50,7 +59,8 @@ local Toggles = {
 
 local function UpdateMenu()
     local v = Menu.Open
-    Title.Visible = v; Status.Visible = v
+    Title.Visible = v
+    Status.Visible = v
     for _, t in pairs(Toggles) do t.Visible = v end
 end
 
@@ -61,7 +71,7 @@ UIS.InputBegan:Connect(function(i)
     end
 end)
 
--- ==================== SETTINGS ====================
+-- ========== SETTINGS ==========
 local Settings = {
     PlayerESP = {Enabled = false},
     Chams = {Enabled = false},
@@ -69,20 +79,26 @@ local Settings = {
     Freecam = {Enabled = false, Speed = 120}
 }
 
--- ==================== OPTIMIZED VARIABLES ====================
-local ESPData = {}
-local Chams = {}
-local XrayCache = {}
-local Targets = {}  -- Кэш целей для ESP
-local FreecamPos = Camera.CFrame.Position
-local LastESPUpdate = 0
+-- ========== OPTIMIZED VARIABLES ==========
+local ESPData = {}      -- model -> drawing objects
+local ChamsList = {}    -- model -> highlight
+local XrayCache = {}    -- part -> original transparency
+local LastXrayState = nil
+local LastXrayTrans = nil
 
--- ==================== HELPER FUNCTIONS ====================
+-- For throttling ESP updates (optional, reduces CPU)
+local LastESPUpdate = 0
+local ESP_UPDATE_INTERVAL = 0.033  -- ~30 fps for ESP, other features can run at 60
+
+-- Freecam
+local FreecamPos = Camera.CFrame.Position
+
+-- ========== UTILITIES ==========
 local function GetWeapon(model)
     local hand = model:FindFirstChild("HandModel")
     if not hand then return "None" end
-    local list = {"AR15","M4A1","SCAR","SVD","Bow","CrossBow","UZI","Magnum","PumpShotgun","EnergyRifle","GaussRifle"}
-    for _, w in ipairs(list) do
+    local weapons = {"AR15","M4A1","SCAR","SVD","Bow","CrossBow","UZI","Magnum","PumpShotgun","EnergyRifle","GaussRifle","HMAR","LeverActionRifle"}
+    for _, w in ipairs(weapons) do
         if hand:FindFirstChild(w, true) then return w end
     end
     return "Unknown"
@@ -97,137 +113,191 @@ local function IsSleeper(model)
     return false
 end
 
-local function CreateESP(model)
+-- ========== ESP (CREATED ONCE) ==========
+function CreateESP(model)
     if ESPData[model] then return end
     local box = Drawing.new("Square")
-    box.Thickness = 1.6; box.Filled = false; box.Transparency = 1; box.Visible = false
+    box.Thickness = 1.8
+    box.Filled = false
+    box.Transparency = 1
+    box.Visible = false
 
     local name = Drawing.new("Text")
-    name.Size = 14; name.Color = Color3.fromRGB(255,255,255); name.Outline = true; name.Center = true; name.Visible = false
+    name.Size = 14
+    name.Color = Color3.fromRGB(255,255,255)
+    name.Outline = true
+    name.Center = true
+    name.Visible = false
 
     local dist = Drawing.new("Text")
-    dist.Size = 13; dist.Color = Color3.fromRGB(200,200,200); dist.Outline = true; dist.Center = true; dist.Visible = false
+    dist.Size = 13
+    dist.Color = Color3.fromRGB(200,200,200)
+    dist.Outline = true
+    dist.Center = true
+    dist.Visible = false
 
     local weap = Drawing.new("Text")
-    weap.Size = 13; weap.Color = Color3.fromRGB(255,200,100); weap.Outline = true; weap.Center = true; weap.Visible = false
+    weap.Size = 13
+    weap.Color = Color3.fromRGB(255,200,100)
+    weap.Outline = true
+    weap.Center = true
+    weap.Visible = false
 
-    ESPData[model] = {Box = box, Name = name, Dist = dist, Weap = weap}
+    ESPData[model] = {Box=box, Name=name, Dist=dist, Weap=weap}
 end
 
--- ==================== XRAY ====================
-local function ApplyXray(state)
+-- Cleanup ESP for destroyed models
+game.DescendantRemoving:Connect(function(obj)
+    if ESPData[obj] then
+        for _, draw in pairs(ESPData[obj]) do
+            draw:Remove()
+        end
+        ESPData[obj] = nil
+    end
+    if ChamsList[obj] then
+        ChamsList[obj]:Destroy()
+        ChamsList[obj] = nil
+    end
+end)
+
+-- ========== XRAY (APPLY ONCE WHEN NEEDED) ==========
+local function ApplyXray(enable, transparency)
+    local targetTrans = enable and transparency or nil
     for part, origTrans in pairs(XrayCache) do
         if part and part.Parent then
-            part.Transparency = state and Settings.Xray.Trans or origTrans
+            part.Transparency = targetTrans or origTrans
         else
             XrayCache[part] = nil
         end
     end
+    if not enable then
+        -- scan for new parts that might have been added while xray off?
+        -- but to avoid lag, we only cache when enabling first time
+        return
+    end
+    -- cache new parts that appeared after enabling
+    for _, part in ipairs(workspace:GetDescendants()) do
+        if part:IsA("BasePart") then
+            local m = part.Material
+            if m == Enum.Material.Cobblestone or m == Enum.Material.Concrete or m == Enum.Material.Brick or
+               m == Enum.Material.WoodPlanks or m == Enum.Material.Metal then
+                if XrayCache[part] == nil then
+                    XrayCache[part] = part.Transparency
+                end
+                part.Transparency = transparency
+            end
+        end
+    end
 end
 
--- ==================== CACHE TARGETS ====================
-local function UpdateTargets()
-    Targets = {}
-    for _, model in ipairs(workspace:GetChildren()) do
-        if model:IsA("Model") and model ~= Player.Character and (model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("LowerTorso")) then
-            table.insert(Targets, model)
-        end
-    end
-end
-
--- Initial cache
-UpdateTargets()
-workspace.ChildAdded:Connect(function(child)
-    task.wait(0.3)
-    if child:IsA("Model") then UpdateTargets() end
-end)
-workspace.ChildRemoved:Connect(UpdateTargets)
-
--- ==================== MAIN LOOP (OPTIMIZED) ====================
-RunService.Heartbeat:Connect(function(dt)
-    local now = tick()
-
-    -- Player ESP (обновляем не каждый кадр)
-    if Settings.PlayerESP.Enabled and now - LastESPUpdate > 0.035 then -- ~28 FPS update
-        LastESPUpdate = now
-
-        for _, model in ipairs(Targets) do
-            if not model or not model.Parent then continue end
-            local root = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("LowerTorso")
-            if not root then continue end
-
-            CreateESP(model)
-            local data = ESPData[model]
-
-            local top = Camera:WorldToViewportPoint(root.Position + Vector3.new(0, 3.2, 0))
-            local bot = Camera:WorldToViewportPoint(root.Position - Vector3.new(0, 3, 0))
-
-            if top.Z < 0 then
-                data.Box.Visible = false; data.Name.Visible = false
-                data.Dist.Visible = false; data.Weap.Visible = false
-                continue
-            end
-
-            local height = bot.Y - top.Y
-            local width = height * 0.65
-            local distance = math.floor((root.Position - Camera.CFrame.Position).Magnitude)
-            local isSleeping = IsSleeper(model)
-
-            data.Box.Color = isSleeping and Color3.fromRGB(255, 85, 85) or Color3.fromRGB(0, 255, 100)
-            data.Name.Text = isSleeping and (model.Name .. " [SLEEP]") or model.Name
-            data.Name.Color = isSleeping and Color3.fromRGB(255, 100, 100) or Color3.fromRGB(255, 255, 255)
-
-            data.Box.Size = Vector2.new(width, height)
-            data.Box.Position = Vector2.new(top.X - width/2, top.Y)
-            data.Box.Visible = true
-
-            data.Name.Position = Vector2.new(top.X, top.Y - 22)
-            data.Name.Visible = true
-
-            data.Dist.Text = distance .. "m"
-            data.Dist.Position = Vector2.new(top.X, bot.Y + 6)
-            data.Dist.Visible = true
-
-            data.Weap.Text = GetWeapon(model)
-            data.Weap.Position = Vector2.new(top.X, bot.Y + 24)
-            data.Weap.Visible = true
-        end
-    elseif not Settings.PlayerESP.Enabled then
-        for _, data in pairs(ESPData) do
-            data.Box.Visible = false
-            data.Name.Visible = false
-            data.Dist.Visible = false
-            data.Weap.Visible = false
-        end
-    end
-
-    -- Chams (оптимизировано)
-    if Settings.Chams.Enabled then
-        for _, model in ipairs(Targets) do
-            if not Chams[model] then
-                local hl = Instance.new("Highlight")
-                hl.FillTransparency = 0.65
-                hl.OutlineTransparency = 0.3
-                hl.FillColor = Color3.fromRGB(0, 170, 255)
-                hl.Parent = model
-                Chams[model] = hl
-            end
-            Chams[model].Enabled = true
-        end
-    else
-        for model, hl in pairs(Chams) do
-            if hl then hl.Enabled = false end
-        end
-    end
-
-    -- Xray
+-- Call this when Xray state or transparency changes
+local function UpdateXray()
     if Settings.Xray.Enabled then
-        ApplyXray(true)
+        ApplyXray(true, Settings.Xray.Trans)
     else
         ApplyXray(false)
     end
+    LastXrayState = Settings.Xray.Enabled
+    LastXrayTrans = Settings.Xray.Trans
+end
 
-    -- Freecam
+-- ========== MAIN LOOP (OPTIMIZED) ==========
+RunService.RenderStepped:Connect(function(dt)
+    local now = tick()
+    
+    -- ===== Xray (update only if changed) =====
+    if Settings.Xray.Enabled ~= LastXrayState or Settings.Xray.Trans ~= LastXrayTrans then
+        UpdateXray()
+    end
+    
+    -- ===== Chams (only for existing models, no extra loops) =====
+    if Settings.Chams.Enabled then
+        for _, model in ipairs(workspace:GetChildren()) do
+            if model:IsA("Model") and model:FindFirstChild("HumanoidRootPart") then
+                if not ChamsList[model] then
+                    local hl = Instance.new("Highlight")
+                    hl.FillTransparency = 0.6
+                    hl.OutlineTransparency = 0
+                    hl.FillColor = Color3.fromRGB(0,170,255)
+                    hl.OutlineColor = Color3.fromRGB(255,255,255)
+                    hl.Parent = model
+                    ChamsList[model] = hl
+                end
+                ChamsList[model].Enabled = true
+            end
+        end
+    else
+        for _, hl in pairs(ChamsList) do
+            if hl then hl.Enabled = false end
+        end
+    end
+    
+    -- ===== Player ESP (throttled to reduce lag) =====
+    if Settings.PlayerESP.Enabled then
+        if now - LastESPUpdate >= ESP_UPDATE_INTERVAL or not LastESPUpdate then
+            LastESPUpdate = now
+            -- Iterate only through models that have HumanoidRootPart
+            for _, model in ipairs(workspace:GetChildren()) do
+                if not model:IsA("Model") or model == Player.Character then continue end
+                local root = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("LowerTorso")
+                if not root then continue end
+                
+                CreateESP(model)
+                local data = ESPData[model]
+                if not data then continue end
+                
+                local top = Camera:WorldToViewportPoint(root.Position + Vector3.new(0,3.2,0))
+                local bot = Camera:WorldToViewportPoint(root.Position - Vector3.new(0,3,0))
+                
+                if top.Z < 0 then
+                    data.Box.Visible = false
+                    data.Name.Visible = false
+                    data.Dist.Visible = false
+                    data.Weap.Visible = false
+                else
+                    local height = bot.Y - top.Y
+                    local width = height * 0.65
+                    local distance = math.floor((root.Position - Camera.CFrame.Position).Magnitude)
+                    local isSleeping = IsSleeper(model)
+                    
+                    if isSleeping then
+                        data.Box.Color = Color3.fromRGB(255,85,85)
+                        data.Name.Text = model.Name .. " [SLEEP]"
+                        data.Name.Color = Color3.fromRGB(255,100,100)
+                    else
+                        data.Box.Color = Color3.fromRGB(0,255,100)
+                        data.Name.Text = model.Name
+                        data.Name.Color = Color3.fromRGB(255,255,255)
+                    end
+                    
+                    data.Box.Size = Vector2.new(width, height)
+                    data.Box.Position = Vector2.new(top.X - width/2, top.Y)
+                    data.Box.Visible = true
+                    
+                    data.Name.Position = Vector2.new(top.X, top.Y - 22)
+                    data.Name.Visible = true
+                    
+                    data.Dist.Text = distance .. "m"
+                    data.Dist.Position = Vector2.new(top.X, bot.Y + 6)
+                    data.Dist.Visible = true
+                    
+                    data.Weap.Text = GetWeapon(model)
+                    data.Weap.Position = Vector2.new(top.X, bot.Y + 24)
+                    data.Weap.Visible = true
+                end
+            end
+        end
+    else
+        -- Hide all ESP elements
+        for _, data in pairs(ESPData) do
+            if data.Box then data.Box.Visible = false end
+            if data.Name then data.Name.Visible = false end
+            if data.Dist then data.Dist.Visible = false end
+            if data.Weap then data.Weap.Visible = false end
+        end
+    end
+    
+    -- ===== Freecam =====
     if Settings.Freecam.Enabled then
         local move = Vector3.new()
         if UIS:IsKeyDown(Enum.KeyCode.W) then move += Camera.CFrame.LookVector end
@@ -236,7 +306,7 @@ RunService.Heartbeat:Connect(function(dt)
         if UIS:IsKeyDown(Enum.KeyCode.D) then move += Camera.CFrame.RightVector end
         if UIS:IsKeyDown(Enum.KeyCode.Space) then move += Vector3.new(0,1,0) end
         if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then move -= Vector3.new(0,1,0) end
-
+        
         if move.Magnitude > 0 then
             FreecamPos = FreecamPos + move.Unit * Settings.Freecam.Speed * dt
         end
@@ -244,7 +314,7 @@ RunService.Heartbeat:Connect(function(dt)
     end
 end)
 
--- ==================== KEYBINDS ====================
+-- ========== KEYBINDS ==========
 UIS.InputBegan:Connect(function(inp)
     if not Menu.Open then return end
     if inp.KeyCode == Enum.KeyCode.F1 then
@@ -256,8 +326,12 @@ UIS.InputBegan:Connect(function(inp)
     elseif inp.KeyCode == Enum.KeyCode.F3 then
         Settings.Xray.Enabled = not Settings.Xray.Enabled
         Toggles.Xray.Text = Settings.Xray.Enabled and "[✔] Xray" or "[ ] Xray"
+        UpdateXray()
     elseif inp.KeyCode == Enum.KeyCode.F4 then
         Settings.Freecam.Enabled = not Settings.Freecam.Enabled
         Toggles.Freecam.Text = Settings.Freecam.Enabled and "[✔] Freecam" or "[ ] Freecam"
     end
 end)
+
+-- Initial Xray state
+UpdateXray()
