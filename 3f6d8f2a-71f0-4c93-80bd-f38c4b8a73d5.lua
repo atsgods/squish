@@ -1,4 +1,4 @@
--- blazzed | Trident Survival V5 - Silent & Optimized + Freecam fix + Container&Ore ESP
+-- blazzed | Trident Survival V5 - Silent & Optimized + Container/Ore ESP Fixed
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
@@ -116,15 +116,67 @@ local ContainerData = setmetatable({}, {__mode = "k"})  -- model -> {text, ancho
 local OreData = setmetatable({}, {__mode = "k"})        -- model -> {text, part, oreType}
 local OreCache = setmetatable({}, {__mode = "k"})       -- model -> {t, p}
 
+-- Weapon detection cache (из Goose)
+local WeaponCache = setmetatable({}, {__mode = "k"})
+local WeaponTimeCache = setmetatable({}, {__mode = "k"})
+
+-- Таблица оружия и их характерных частей (из Goose)
+local WeaponParts = {
+    AR15             = {"AnimSaves","Barrel","Body","Bolt","ChargingHandle","Decor","Grip","Mag","Rails","Stock","Muzzle"},
+    M4A1             = {"DefaultSight","Body","Bolt","ChargeHandle","Grip","Mag","Metal","mbrk","Muzzle"},
+    SCAR             = {"DefaultSight","Barrel","Body","ChargingHandle","Decals","Mag","Rails","ShoulderPad","Stock"},
+    SVD              = {"DefaultSight","Body","Bolt","Magazine","Magazine2","Metal2","Wood"},
+    Bow              = {"Arrow","Fabric","Handle","Meshes/Bow","ADS","Mover","AnimationController"},
+    CrossBow         = {"Arrow","BackMetal","Body","FrontNails","Handle","Release","SpringSteel","String","Wheel","Slide"},
+    UZI              = {"DefaultSight","Body","Body2","Bolt","ChargingHandle","Decor","Grip","Mag","Stock","Muzzle"},
+    Magnum           = {"Cylinder","Decor","EjectRod","EjectRodDecal","Frame","Grip"},
+    PumpShotgun      = {"Barrel","Body","Handle","MainMetal","RearSight","Shell","Slider","ADS","Muzzle"},
+    EnergyRifle      = {"DefaultSight","FrontCover","Glowing","Grip","Mag","Metal","Metal2","RearCover","RearDecor","Screws","Tubes"},
+    GaussRifle       = {"DefaultSight","Barrel","Body","CoilHolders","Coils","Decals1","Decals2","Grip","Housing","Mag","StockBack"},
+    HMAR             = {"DefaultSight","Body","Bolt","Bolts","Cover","Mag","Rails","Spring","Stock","Wood","Muzzle"},
+    LeverActionRifle = {"9mm","DefaultSight","Body","Brass","Hammer","Lever","Metal","Thing","Wood","Muzzle"},
+}
+
 -- ========== UTILITIES ==========
+-- Улучшенное определение оружия (по Goose)
 local function GetWeapon(model)
-    local hand = model:FindFirstChild("HandModel")
-    if not hand then return "None" end
-    local weapons = {"AR15","M4A1","SCAR","SVD","Bow","CrossBow","UZI","Magnum","PumpShotgun","EnergyRifle","GaussRifle","HMAR","LeverActionRifle"}
-    for _, w in ipairs(weapons) do
-        if hand:FindFirstChild(w, true) then return w end
+    local now = tick()
+    local cached = WeaponCache[model]
+    local cachedTime = WeaponTimeCache[model]
+    if cached and cachedTime and now - cachedTime < 2 then
+        return cached
     end
-    return "Unknown"
+    
+    local hand = model:FindFirstChild("HandModel")
+    if not hand then
+        WeaponCache[model] = "None"
+        WeaponTimeCache[model] = now
+        return "None"
+    end
+    
+    local bestMatch = "None"
+    local bestScore = 0
+    
+    for weaponName, parts in pairs(WeaponParts) do
+        local score = 0
+        for _, partName in ipairs(parts) do
+            if hand:FindFirstChild(partName, true) then
+                score = score + 1
+            end
+        end
+        if score > bestScore then
+            bestScore = score
+            bestMatch = weaponName
+        end
+    end
+    
+    if bestScore < 2 then
+        bestMatch = "None"
+    end
+    
+    WeaponCache[model] = bestMatch
+    WeaponTimeCache[model] = now
+    return bestMatch
 end
 
 local function IsSleeper(model)
@@ -190,6 +242,8 @@ game.DescendantRemoving:Connect(function(obj)
         OreData[obj] = nil
     end
     OreCache[obj] = nil
+    WeaponCache[obj] = nil
+    WeaponTimeCache[obj] = nil
 end)
 
 -- ========== XRAY ==========
@@ -447,7 +501,8 @@ RunService.RenderStepped:Connect(function(dt)
                     data.Dist.Position = Vector2.new(top.X, bot.Y + 6)
                     data.Dist.Visible = true
                     
-                    data.Weap.Text = GetWeapon(model)
+                    local weaponName = GetWeapon(model)
+                    data.Weap.Text = weaponName
                     data.Weap.Position = Vector2.new(top.X, bot.Y + 24)
                     data.Weap.Visible = true
                 end
@@ -478,7 +533,7 @@ RunService.RenderStepped:Connect(function(dt)
         Camera.CFrame = CFrame.new(FreecamPos, FreecamPos + Camera.CFrame.LookVector)
     end
     
-    -- ===== CONTAINER ESP =====
+    -- ===== CONTAINER ESP (с принудительным скрытием при отключении) =====
     if Settings.ContainerESP.Enabled then
         local maxDistSq = Settings.ContainerESP.MaxDist ^ 2
         local camPos = Camera.CFrame.Position
@@ -490,7 +545,7 @@ RunService.RenderStepped:Connect(function(dt)
             end
             local kind = data.kind
             if not ContainerTypes[kind].enabled then
-                data.text.Visible = false
+                if data.text then data.text.Visible = false end
                 continue
             end
             local pos = data.anchor.Position
@@ -513,12 +568,13 @@ RunService.RenderStepped:Connect(function(dt)
             end
         end
     else
+        -- Принудительно скрываем все тексты контейнеров
         for _, data in pairs(ContainerData) do
-            if data.text then data.text.Visible = false end
+            if data and data.text then data.text.Visible = false end
         end
     end
     
-    -- ===== ORE ESP =====
+    -- ===== ORE ESP (с принудительным скрытием при отключении) =====
     if Settings.OreESP.Enabled then
         local maxDistSq = Settings.OreESP.MaxDist ^ 2
         local camPos = Camera.CFrame.Position
@@ -529,7 +585,7 @@ RunService.RenderStepped:Connect(function(dt)
             end
             local oreType = data.oreType
             if not OreTypes[oreType].enabled then
-                data.text.Visible = false
+                if data.text then data.text.Visible = false end
                 continue
             end
             local pos = data.part.Position
@@ -548,8 +604,9 @@ RunService.RenderStepped:Connect(function(dt)
             end
         end
     else
+        -- Принудительно скрываем все тексты руд
         for _, data in pairs(OreData) do
-            if data.text then data.text.Visible = false end
+            if data and data.text then data.text.Visible = false end
         end
     end
 end)
@@ -576,9 +633,20 @@ UIS.InputBegan:Connect(function(inp)
     elseif inp.KeyCode == Enum.KeyCode.F5 then
         Settings.ContainerESP.Enabled = not Settings.ContainerESP.Enabled
         Toggles.ContainerESP.Text = Settings.ContainerESP.Enabled and "[✔] Container ESP" or "[ ] Container ESP"
+        -- Принудительно обновляем видимость
+        if not Settings.ContainerESP.Enabled then
+            for _, data in pairs(ContainerData) do
+                if data and data.text then data.text.Visible = false end
+            end
+        end
     elseif inp.KeyCode == Enum.KeyCode.F6 then
         Settings.OreESP.Enabled = not Settings.OreESP.Enabled
         Toggles.OreESP.Text = Settings.OreESP.Enabled and "[✔] Ore ESP" or "[ ] Ore ESP"
+        if not Settings.OreESP.Enabled then
+            for _, data in pairs(OreData) do
+                if data and data.text then data.text.Visible = false end
+            end
+        end
     end
 end)
 
