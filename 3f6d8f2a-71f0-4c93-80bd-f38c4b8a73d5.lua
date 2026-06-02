@@ -69,9 +69,13 @@ local Settings = {
     Freecam = {Enabled = false, Speed = 120}
 }
 
--- ==================== IMPROVED PLAYER ESP ====================
+-- ==================== VARIABLES ====================
 local ESPData = {}
+local Chams = {}          -- ← Исправлено
+local XrayCache = {}      -- ← Исправлено
+local FreecamPos = Camera.CFrame.Position
 
+-- ==================== PLAYER ESP ====================
 local function GetWeapon(model)
     local hand = model:FindFirstChild("HandModel")
     if not hand then return "None" end
@@ -124,12 +128,28 @@ local function CreateESP(model)
     ESPData[model] = {Box = box, Name = name, Dist = dist, Weap = weap}
 end
 
+-- ==================== XRAY ====================
+local function ApplyXray(state)
+    for _, part in ipairs(workspace:GetDescendants()) do
+        if part:IsA("BasePart") then
+            local m = part.Material
+            if m == Enum.Material.Cobblestone or m == Enum.Material.Concrete or m == Enum.Material.Brick or 
+               m == Enum.Material.WoodPlanks or m == Enum.Material.Metal then
+                if not XrayCache[part] then 
+                    XrayCache[part] = part.Transparency 
+                end
+                part.Transparency = state and Settings.Xray.Trans or XrayCache[part]
+            end
+        end
+    end
+end
+
 -- ==================== MAIN LOOP ====================
 RunService.RenderStepped:Connect(function(dt)
+    -- Player ESP
     if Settings.PlayerESP.Enabled then
         for _, model in ipairs(workspace:GetChildren()) do
             if not model:IsA("Model") or model == Player.Character then continue end
-            
             local root = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("LowerTorso")
             if not root then continue end
 
@@ -140,10 +160,8 @@ RunService.RenderStepped:Connect(function(dt)
             local bot = Camera:WorldToViewportPoint(root.Position - Vector3.new(0, 3, 0))
 
             if top.Z < 0 then 
-                data.Box.Visible = false
-                data.Name.Visible = false
-                data.Dist.Visible = false
-                data.Weap.Visible = false
+                data.Box.Visible = false; data.Name.Visible = false
+                data.Dist.Visible = false; data.Weap.Visible = false
                 continue 
             end
 
@@ -152,32 +170,27 @@ RunService.RenderStepped:Connect(function(dt)
             local distance = math.floor((root.Position - Camera.CFrame.Position).Magnitude)
             local isSleeping = IsSleeper(model)
 
-            -- === Цвета ===
             if isSleeping then
-                data.Box.Color = Color3.fromRGB(255, 100, 100)     -- красный для спящих
-                data.Name.Color = Color3.fromRGB(255, 80, 80)
+                data.Box.Color = Color3.fromRGB(255, 85, 85)
                 data.Name.Text = model.Name .. " [SLEEP]"
+                data.Name.Color = Color3.fromRGB(255, 100, 100)
             else
-                data.Box.Color = Color3.fromRGB(0, 255, 100)       -- зелёный для обычных
-                data.Name.Color = Color3.fromRGB(255, 255, 255)
+                data.Box.Color = Color3.fromRGB(0, 255, 100)
                 data.Name.Text = model.Name
+                data.Name.Color = Color3.fromRGB(255, 255, 255)
             end
 
-            -- Box
             data.Box.Size = Vector2.new(width, height)
             data.Box.Position = Vector2.new(top.X - width/2, top.Y)
             data.Box.Visible = true
 
-            -- Name
             data.Name.Position = Vector2.new(top.X, top.Y - 22)
             data.Name.Visible = true
 
-            -- Distance
             data.Dist.Text = distance .. "m"
             data.Dist.Position = Vector2.new(top.X, bot.Y + 6)
             data.Dist.Visible = true
 
-            -- Weapon
             data.Weap.Text = GetWeapon(model)
             data.Weap.Position = Vector2.new(top.X, bot.Y + 24)
             data.Weap.Visible = true
@@ -197,9 +210,10 @@ RunService.RenderStepped:Connect(function(dt)
             if model:IsA("Model") and model:FindFirstChild("HumanoidRootPart") then
                 if not Chams[model] then
                     local hl = Instance.new("Highlight")
-                    hl.FillTransparency = 0.7
+                    hl.FillTransparency = 0.6
                     hl.OutlineTransparency = 0
-                    hl.FillColor = Color3.fromRGB(0, 180, 255)
+                    hl.FillColor = Color3.fromRGB(0, 170, 255)
+                    hl.OutlineColor = Color3.fromRGB(255, 255, 255)
                     hl.Parent = model
                     Chams[model] = hl
                 end
@@ -207,11 +221,17 @@ RunService.RenderStepped:Connect(function(dt)
             end
         end
     else
-        for _, hl in pairs(Chams) do if hl then hl.Enabled = false end end
+        for _, hl in pairs(Chams) do
+            if hl and hl.Parent then hl.Enabled = false end
+        end
     end
 
     -- Xray
-    ApplyXray(Settings.Xray.Enabled)
+    if Settings.Xray.Enabled then
+        ApplyXray(true)
+    else
+        ApplyXray(false)
+    end
 
     -- Freecam
     if Settings.Freecam.Enabled then
