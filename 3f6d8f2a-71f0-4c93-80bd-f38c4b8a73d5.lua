@@ -1,4 +1,4 @@
--- blazzed | Trident Survival V5 - Ключ: atsgey (исправленный)
+-- blazzed | Trident Survival V5 - Ключ: atsgey (финальная версия)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
@@ -23,7 +23,7 @@ pcall(function()
     setreadonly(mt, true)
 end)
 
--- ========== КЛЮЧЕВАЯ ЗАЩИТА (ИСПРАВЛЕННАЯ) ==========
+-- ========== КЛЮЧЕВАЯ ЗАЩИТА (исправлено сообщение об ошибке) ==========
 local inputString = ""
 local waitingForKey = true
 
@@ -83,7 +83,7 @@ buttonText.Center = true
 buttonText.Outline = false
 buttonText.Visible = true
 
--- Сообщение об ошибке (без указания правильного ключа)
+-- Сообщение об ошибке (ТОЛЬКО "Неверный ключ!")
 local errorMsg = Drawing.new("Text")
 errorMsg.Text = ""
 errorMsg.Size = 14
@@ -103,7 +103,7 @@ Camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
     errorMsg.Position = Vector2.new(bg.Position.X + 200, bg.Position.Y + 185)
 end)
 
--- Функция проверки ключа (без вывода ожидаемого ключа)
+-- Функция проверки ключа
 local function checkKey()
     if inputString == "atsgey" then
         waitingForKey = false
@@ -112,7 +112,7 @@ local function checkKey()
             obj:Remove()
         end
     else
-        errorMsg.Text = "Неверный ключ! Попробуйте снова."
+        errorMsg.Text = "Неверный ключ!"
         inputString = ""
         inputText.Text = ""
         task.wait(2)
@@ -219,18 +219,18 @@ local FreecamPos = Camera.CFrame.Position
 local WeaponCache = setmetatable({}, {__mode = "k"})
 local WeaponTimeCache = setmetatable({}, {__mode = "k"})
 local WeaponParts = {
-    AR15             = {"AnimSaves","Barrel","Body","Bolt","ChargingHandle","Decor","Grip","Mag","Rails","Stock","Muzzle"},
-    M4A1             = {"DefaultSight","Body","Bolt","ChargeHandle","Grip","Mag","Metal","mbrk","Muzzle"},
-    SCAR             = {"DefaultSight","Barrel","Body","ChargingHandle","Decals","Mag","Rails","ShoulderPad","Stock"},
-    SVD              = {"DefaultSight","Body","Bolt","Magazine","Magazine2","Metal2","Wood"},
-    Bow              = {"Arrow","Fabric","Handle","Meshes/Bow","ADS","Mover","AnimationController"},
-    CrossBow         = {"Arrow","BackMetal","Body","FrontNails","Handle","Release","SpringSteel","String","Wheel","Slide"},
-    UZI              = {"DefaultSight","Body","Body2","Bolt","ChargingHandle","Decor","Grip","Mag","Stock","Muzzle"},
-    Magnum           = {"Cylinder","Decor","EjectRod","EjectRodDecal","Frame","Grip"},
-    PumpShotgun      = {"Barrel","Body","Handle","MainMetal","RearSight","Shell","Slider","ADS","Muzzle"},
-    EnergyRifle      = {"DefaultSight","FrontCover","Glowing","Grip","Mag","Metal","Metal2","RearCover","RearDecor","Screws","Tubes"},
-    GaussRifle       = {"DefaultSight","Barrel","Body","CoilHolders","Coils","Decals1","Decals2","Grip","Housing","Mag","StockBack"},
-    HMAR             = {"DefaultSight","Body","Bolt","Bolts","Cover","Mag","Rails","Spring","Stock","Wood","Muzzle"},
+    AR15 = {"AnimSaves","Barrel","Body","Bolt","ChargingHandle","Decor","Grip","Mag","Rails","Stock","Muzzle"},
+    M4A1 = {"DefaultSight","Body","Bolt","ChargeHandle","Grip","Mag","Metal","mbrk","Muzzle"},
+    SCAR = {"DefaultSight","Barrel","Body","ChargingHandle","Decals","Mag","Rails","ShoulderPad","Stock"},
+    SVD = {"DefaultSight","Body","Bolt","Magazine","Magazine2","Metal2","Wood"},
+    Bow = {"Arrow","Fabric","Handle","Meshes/Bow","ADS","Mover","AnimationController"},
+    CrossBow = {"Arrow","BackMetal","Body","FrontNails","Handle","Release","SpringSteel","String","Wheel","Slide"},
+    UZI = {"DefaultSight","Body","Body2","Bolt","ChargingHandle","Decor","Grip","Mag","Stock","Muzzle"},
+    Magnum = {"Cylinder","Decor","EjectRod","EjectRodDecal","Frame","Grip"},
+    PumpShotgun = {"Barrel","Body","Handle","MainMetal","RearSight","Shell","Slider","ADS","Muzzle"},
+    EnergyRifle = {"DefaultSight","FrontCover","Glowing","Grip","Mag","Metal","Metal2","RearCover","RearDecor","Screws","Tubes"},
+    GaussRifle = {"DefaultSight","Barrel","Body","CoilHolders","Coils","Decals1","Decals2","Grip","Housing","Mag","StockBack"},
+    HMAR = {"DefaultSight","Body","Bolt","Bolts","Cover","Mag","Rails","Spring","Stock","Wood","Muzzle"},
     LeverActionRifle = {"9mm","DefaultSight","Body","Brass","Hammer","Lever","Metal","Thing","Wood","Muzzle"},
 }
 
