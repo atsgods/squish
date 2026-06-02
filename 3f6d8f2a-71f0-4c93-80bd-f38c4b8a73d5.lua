@@ -1,5 +1,5 @@
 -- blazzed | script | Trident Survival V5
--- Silent Version - Fixed & Improved
+-- Optimized Version
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -17,7 +17,7 @@ pcall(function()
         local method = getnamecallmethod()
         if method == "FireServer" or method == "InvokeServer" then
             local arg = tostring(select(1, ...))
-            if arg:find("Ban") or arg:find("Kick") or arg:find("Detect") or arg:find("Report") then return end
+            if arg:find("Ban") or arg:find("Kick") or arg:find("Detect") then return end
         end
         if method == "Kick" then return end
         return old(self, ...)
@@ -69,18 +69,20 @@ local Settings = {
     Freecam = {Enabled = false, Speed = 120}
 }
 
--- ==================== VARIABLES ====================
+-- ==================== OPTIMIZED VARIABLES ====================
 local ESPData = {}
-local Chams = {}          -- ← Исправлено
-local XrayCache = {}      -- ← Исправлено
+local Chams = {}
+local XrayCache = {}
+local Targets = {}  -- Кэш целей для ESP
 local FreecamPos = Camera.CFrame.Position
+local LastESPUpdate = 0
 
--- ==================== PLAYER ESP ====================
+-- ==================== HELPER FUNCTIONS ====================
 local function GetWeapon(model)
     local hand = model:FindFirstChild("HandModel")
     if not hand then return "None" end
-    local weapons = {"AR15","M4A1","SCAR","SVD","Bow","CrossBow","UZI","Magnum","PumpShotgun","EnergyRifle","GaussRifle","HMAR","LeverActionRifle"}
-    for _, w in ipairs(weapons) do
+    local list = {"AR15","M4A1","SCAR","SVD","Bow","CrossBow","UZI","Magnum","PumpShotgun","EnergyRifle","GaussRifle"}
+    for _, w in ipairs(list) do
         if hand:FindFirstChild(w, true) then return w end
     end
     return "Unknown"
@@ -97,59 +99,60 @@ end
 
 local function CreateESP(model)
     if ESPData[model] then return end
-    
     local box = Drawing.new("Square")
-    box.Thickness = 1.8
-    box.Filled = false
-    box.Transparency = 1
-    box.Visible = false
+    box.Thickness = 1.6; box.Filled = false; box.Transparency = 1; box.Visible = false
 
     local name = Drawing.new("Text")
-    name.Size = 14
-    name.Color = Color3.fromRGB(255, 255, 255)
-    name.Outline = true
-    name.Center = true
-    name.Visible = false
+    name.Size = 14; name.Color = Color3.fromRGB(255,255,255); name.Outline = true; name.Center = true; name.Visible = false
 
     local dist = Drawing.new("Text")
-    dist.Size = 13
-    dist.Color = Color3.fromRGB(200, 200, 200)
-    dist.Outline = true
-    dist.Center = true
-    dist.Visible = false
+    dist.Size = 13; dist.Color = Color3.fromRGB(200,200,200); dist.Outline = true; dist.Center = true; dist.Visible = false
 
     local weap = Drawing.new("Text")
-    weap.Size = 13
-    weap.Color = Color3.fromRGB(255, 200, 100)
-    weap.Outline = true
-    weap.Center = true
-    weap.Visible = false
+    weap.Size = 13; weap.Color = Color3.fromRGB(255,200,100); weap.Outline = true; weap.Center = true; weap.Visible = false
 
     ESPData[model] = {Box = box, Name = name, Dist = dist, Weap = weap}
 end
 
 -- ==================== XRAY ====================
 local function ApplyXray(state)
-    for _, part in ipairs(workspace:GetDescendants()) do
-        if part:IsA("BasePart") then
-            local m = part.Material
-            if m == Enum.Material.Cobblestone or m == Enum.Material.Concrete or m == Enum.Material.Brick or 
-               m == Enum.Material.WoodPlanks or m == Enum.Material.Metal then
-                if not XrayCache[part] then 
-                    XrayCache[part] = part.Transparency 
-                end
-                part.Transparency = state and Settings.Xray.Trans or XrayCache[part]
-            end
+    for part, origTrans in pairs(XrayCache) do
+        if part and part.Parent then
+            part.Transparency = state and Settings.Xray.Trans or origTrans
+        else
+            XrayCache[part] = nil
         end
     end
 end
 
--- ==================== MAIN LOOP ====================
-RunService.RenderStepped:Connect(function(dt)
-    -- Player ESP
-    if Settings.PlayerESP.Enabled then
-        for _, model in ipairs(workspace:GetChildren()) do
-            if not model:IsA("Model") or model == Player.Character then continue end
+-- ==================== CACHE TARGETS ====================
+local function UpdateTargets()
+    Targets = {}
+    for _, model in ipairs(workspace:GetChildren()) do
+        if model:IsA("Model") and model ~= Player.Character and (model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("LowerTorso")) then
+            table.insert(Targets, model)
+        end
+    end
+end
+
+-- Initial cache
+UpdateTargets()
+workspace.ChildAdded:Connect(function(child)
+    task.wait(0.3)
+    if child:IsA("Model") then UpdateTargets() end
+end)
+workspace.ChildRemoved:Connect(UpdateTargets)
+
+-- ==================== MAIN LOOP (OPTIMIZED) ====================
+RunService.Heartbeat:Connect(function(dt)
+    local now = tick()
+
+    -- Player ESP (обновляем не каждый кадр)
+    if Settings.PlayerESP.Enabled and now - LastESPUpdate > 0.035 then -- ~28 FPS update
+        LastESPUpdate = now
+
+        for _, model in ipairs(Targets) do
+            if not model or not model.Parent then continue end
             local root = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("LowerTorso")
             if not root then continue end
 
@@ -159,10 +162,10 @@ RunService.RenderStepped:Connect(function(dt)
             local top = Camera:WorldToViewportPoint(root.Position + Vector3.new(0, 3.2, 0))
             local bot = Camera:WorldToViewportPoint(root.Position - Vector3.new(0, 3, 0))
 
-            if top.Z < 0 then 
+            if top.Z < 0 then
                 data.Box.Visible = false; data.Name.Visible = false
                 data.Dist.Visible = false; data.Weap.Visible = false
-                continue 
+                continue
             end
 
             local height = bot.Y - top.Y
@@ -170,15 +173,9 @@ RunService.RenderStepped:Connect(function(dt)
             local distance = math.floor((root.Position - Camera.CFrame.Position).Magnitude)
             local isSleeping = IsSleeper(model)
 
-            if isSleeping then
-                data.Box.Color = Color3.fromRGB(255, 85, 85)
-                data.Name.Text = model.Name .. " [SLEEP]"
-                data.Name.Color = Color3.fromRGB(255, 100, 100)
-            else
-                data.Box.Color = Color3.fromRGB(0, 255, 100)
-                data.Name.Text = model.Name
-                data.Name.Color = Color3.fromRGB(255, 255, 255)
-            end
+            data.Box.Color = isSleeping and Color3.fromRGB(255, 85, 85) or Color3.fromRGB(0, 255, 100)
+            data.Name.Text = isSleeping and (model.Name .. " [SLEEP]") or model.Name
+            data.Name.Color = isSleeping and Color3.fromRGB(255, 100, 100) or Color3.fromRGB(255, 255, 255)
 
             data.Box.Size = Vector2.new(width, height)
             data.Box.Position = Vector2.new(top.X - width/2, top.Y)
@@ -195,7 +192,7 @@ RunService.RenderStepped:Connect(function(dt)
             data.Weap.Position = Vector2.new(top.X, bot.Y + 24)
             data.Weap.Visible = true
         end
-    else
+    elseif not Settings.PlayerESP.Enabled then
         for _, data in pairs(ESPData) do
             data.Box.Visible = false
             data.Name.Visible = false
@@ -204,25 +201,22 @@ RunService.RenderStepped:Connect(function(dt)
         end
     end
 
-    -- Chams
+    -- Chams (оптимизировано)
     if Settings.Chams.Enabled then
-        for _, model in ipairs(workspace:GetChildren()) do
-            if model:IsA("Model") and model:FindFirstChild("HumanoidRootPart") then
-                if not Chams[model] then
-                    local hl = Instance.new("Highlight")
-                    hl.FillTransparency = 0.6
-                    hl.OutlineTransparency = 0
-                    hl.FillColor = Color3.fromRGB(0, 170, 255)
-                    hl.OutlineColor = Color3.fromRGB(255, 255, 255)
-                    hl.Parent = model
-                    Chams[model] = hl
-                end
-                Chams[model].Enabled = true
+        for _, model in ipairs(Targets) do
+            if not Chams[model] then
+                local hl = Instance.new("Highlight")
+                hl.FillTransparency = 0.65
+                hl.OutlineTransparency = 0.3
+                hl.FillColor = Color3.fromRGB(0, 170, 255)
+                hl.Parent = model
+                Chams[model] = hl
             end
+            Chams[model].Enabled = true
         end
     else
-        for _, hl in pairs(Chams) do
-            if hl and hl.Parent then hl.Enabled = false end
+        for model, hl in pairs(Chams) do
+            if hl then hl.Enabled = false end
         end
     end
 
