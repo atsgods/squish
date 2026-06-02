@@ -1,5 +1,5 @@
 -- blazzed | script | Trident Survival V5
--- Silent Version - Fixed
+-- Silent Version
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -7,7 +7,7 @@ local UIS = game:GetService("UserInputService")
 local Player = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- ==================== BYPASS ====================
+-- ==================== SILENT BYPASS ====================
 pcall(function()
     hookfunction(game:GetService("Stats").GetMemoryUsageMb, function() return math.random(140, 260) end)
     local mt = getrawmetatable(game)
@@ -44,10 +44,9 @@ end
 
 local Toggles = {
     PlayerESP = CreateToggle("Player ESP (F1)", 110),
-    OreESP    = CreateToggle("Ore ESP (F2)", 130),
-    Chams     = CreateToggle("Chams (F3)", 150),
-    Xray      = CreateToggle("Xray (F4)", 170),
-    Freecam   = CreateToggle("Freecam (F5)", 190),
+    Chams     = CreateToggle("Chams (F2)", 130),
+    Xray      = CreateToggle("Xray (F3)", 150),
+    Freecam   = CreateToggle("Freecam (F4)", 170),
 }
 
 local function UpdateMenu()
@@ -66,7 +65,6 @@ end)
 -- ==================== SETTINGS ====================
 local Settings = {
     PlayerESP = {Enabled = false},
-    OreESP = {Enabled = false},
     Chams = {Enabled = false},
     Xray = {Enabled = false, Trans = 0.5},
     Freecam = {Enabled = false, Speed = 120}
@@ -80,9 +78,7 @@ local function GetWeapon(model)
     if not hand then return "None" end
     local list = {"AR15","M4A1","SCAR","SVD","Bow","CrossBow","UZI","Magnum","PumpShotgun","EnergyRifle","GaussRifle"}
     for _, w in ipairs(list) do
-        if hand:FindFirstChild(w, true) or hand:FindFirstChildWhichIsA("MeshPart", true) and hand:FindFirstChild(w) then 
-            return w 
-        end
+        if hand:FindFirstChild(w, true) then return w end
     end
     return "Unknown"
 end
@@ -97,30 +93,19 @@ local function CreatePlayerESP(plr)
     PlayerESPData[plr] = {Box=box, Name=name, Dist=dist, Weap=weap}
 end
 
--- ==================== ORE ESP ====================
-local OreData = {}
-
-local function CreateOreESP(model, oreType)
-    if OreData[model] then return end
-    local t = Drawing.new("Text")
-    t.Size = 14; t.Outline = true; t.Center = true; t.Visible = false
-    t.Color = oreType == "Iron" and Color3.fromRGB(255,215,0) or oreType == "Nitrate" and Color3.fromRGB(100,255,150) or Color3.fromRGB(200,200,200)
-    OreData[model] = {Text = t, Type = oreType}
-end
-
 -- ==================== CHAMS ====================
 local Chams = {}
 
 -- ==================== XRAY ====================
 local XrayCache = {}
 
-local function ApplyXray()
+local function ApplyXray(state)
     for _, part in ipairs(workspace:GetDescendants()) do
         if part:IsA("BasePart") then
             local m = part.Material
             if m == Enum.Material.Cobblestone or m == Enum.Material.Concrete or m == Enum.Material.Brick or m == Enum.Material.WoodPlanks then
                 if not XrayCache[part] then XrayCache[part] = part.Transparency end
-                part.Transparency = Settings.Xray.Enabled and Settings.Xray.Trans or XrayCache[part]
+                part.Transparency = state and Settings.Xray.Trans or XrayCache[part]
             end
         end
     end
@@ -171,38 +156,6 @@ RunService.RenderStepped:Connect(function(dt)
         end
     end
 
-    -- Ore ESP
-    if Settings.OreESP.Enabled then
-        for _, model in ipairs(workspace:GetChildren()) do
-            if model:IsA("Model") then
-                local mp = model:FindFirstChildOfClass("MeshPart")
-                if mp then
-                    local c = mp.Color
-                    local oreType = nil
-                    if c.R == 72/255 and c.G == 72/255 and c.B == 72/255 then oreType = "Stone"
-                    elseif c.R > 0.75 then oreType = "Iron"
-                    elseif c.G > 0.9 then oreType = "Nitrate" end
-
-                    if oreType then
-                        CreateOreESP(model, oreType)
-                        local data = OreData[model]
-                        local pos, onScreen = Camera:WorldToViewportPoint(mp.Position)
-                        if onScreen and pos.Z > 0 then
-                            data.Text.Position = Vector2.new(pos.X, pos.Y)
-                            data.Text.Visible = true
-                        else
-                            data.Text.Visible = false
-                        end
-                    end
-                end
-            end
-        end
-    else
-        for _, data in pairs(OreData) do 
-            if data.Text then data.Text.Visible = false end 
-        end
-    end
-
     -- Chams
     if Settings.Chams.Enabled then
         for _, model in ipairs(workspace:GetChildren()) do
@@ -219,12 +172,16 @@ RunService.RenderStepped:Connect(function(dt)
             end
         end
     else
-        for _, hl in pairs(Chams) do hl.Enabled = false end
+        for _, hl in pairs(Chams) do 
+            if hl then hl.Enabled = false end 
+        end
     end
 
     -- Xray
     if Settings.Xray.Enabled then
-        ApplyXray()
+        ApplyXray(true)
+    else
+        ApplyXray(false)
     end
 
     -- Freecam
@@ -252,15 +209,12 @@ UIS.InputBegan:Connect(function(inp)
         Settings.PlayerESP.Enabled = not Settings.PlayerESP.Enabled
         Toggles.PlayerESP.Text = Settings.PlayerESP.Enabled and "[✔] Player ESP" or "[ ] Player ESP"
     elseif inp.KeyCode == Enum.KeyCode.F2 then
-        Settings.OreESP.Enabled = not Settings.OreESP.Enabled
-        Toggles.OreESP.Text = Settings.OreESP.Enabled and "[✔] Ore ESP" or "[ ] Ore ESP"
-    elseif inp.KeyCode == Enum.KeyCode.F3 then
         Settings.Chams.Enabled = not Settings.Chams.Enabled
         Toggles.Chams.Text = Settings.Chams.Enabled and "[✔] Chams" or "[ ] Chams"
-    elseif inp.KeyCode == Enum.KeyCode.F4 then
+    elseif inp.KeyCode == Enum.KeyCode.F3 then
         Settings.Xray.Enabled = not Settings.Xray.Enabled
         Toggles.Xray.Text = Settings.Xray.Enabled and "[✔] Xray" or "[ ] Xray"
-    elseif inp.KeyCode == Enum.KeyCode.F5 then
+    elseif inp.KeyCode == Enum.KeyCode.F4 then
         Settings.Freecam.Enabled = not Settings.Freecam.Enabled
         Toggles.Freecam.Text = Settings.Freecam.Enabled and "[✔] Freecam" or "[ ] Freecam"
     end
