@@ -23,11 +23,11 @@ pcall(function()
     setreadonly(mt, true)
 end)
 
--- ========== КЛЮЧЕВАЯ ЗАЩИТА ==========
+-- ========== КЛЮЧЕВАЯ ЗАЩИТА (исправленное позиционирование) ==========
 local inputString = ""
 local waitingForKey = true
 
--- Фон (увеличен до 220)
+-- Фон (высота 220)
 local bg = Drawing.new("Square")
 bg.Size = Vector2.new(400, 220)
 bg.Position = Vector2.new((Camera.ViewportSize.X - 400) / 2, (Camera.ViewportSize.Y - 220) / 2)
@@ -64,10 +64,13 @@ inputText.Center = false
 inputText.Outline = false
 inputText.Visible = true
 
--- Кнопка "Войти" (центрирована по вертикали и горизонтали)
+-- Кнопка "Войти" (теперь точно по центру)
+-- Поле ввода заканчивается на Y = 70+40 = 110
+-- Свободное место до низа: 220 - 110 = 110
+-- Центр этого места: 110 + (110-40)/2 = 110 + 35 = 145
 local buttonBg = Drawing.new("Square")
 buttonBg.Size = Vector2.new(140, 40)
-buttonBg.Position = Vector2.new(bg.Position.X + (400 - 140) / 2, bg.Position.Y + 135) -- сместил выше
+buttonBg.Position = Vector2.new(bg.Position.X + (400 - 140) / 2, bg.Position.Y + 145)
 buttonBg.Color = Color3.fromRGB(0, 120, 255)
 buttonBg.Filled = true
 buttonBg.Thickness = 0
@@ -82,24 +85,24 @@ buttonText.Center = true
 buttonText.Outline = false
 buttonText.Visible = true
 
--- Сообщение об ошибке
+-- Сообщение об ошибке (под кнопкой, на расстоянии 10 пикселей)
 local errorMsg = Drawing.new("Text")
 errorMsg.Text = ""
 errorMsg.Size = 14
 errorMsg.Color = Color3.fromRGB(255, 80, 80)
-errorMsg.Position = Vector2.new(bg.Position.X + 200, bg.Position.Y + 195)
+errorMsg.Position = Vector2.new(bg.Position.X + 200, bg.Position.Y + 200)
 errorMsg.Center = true
 errorMsg.Visible = true
 
--- Обновление позиций при изменении размера окна
+-- Обновление позиций
 Camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
     bg.Position = Vector2.new((Camera.ViewportSize.X - 400) / 2, (Camera.ViewportSize.Y - 220) / 2)
     title.Position = Vector2.new(bg.Position.X + 200, bg.Position.Y + 30)
     inputFieldBg.Position = Vector2.new(bg.Position.X + 50, bg.Position.Y + 70)
     inputText.Position = Vector2.new(inputFieldBg.Position.X + 10, inputFieldBg.Position.Y + 8)
-    buttonBg.Position = Vector2.new(bg.Position.X + (400 - 140) / 2, bg.Position.Y + 135)
+    buttonBg.Position = Vector2.new(bg.Position.X + (400 - 140) / 2, bg.Position.Y + 145)
     buttonText.Position = Vector2.new(buttonBg.Position.X + 70, buttonBg.Position.Y + 20)
-    errorMsg.Position = Vector2.new(bg.Position.X + 200, bg.Position.Y + 195)
+    errorMsg.Position = Vector2.new(bg.Position.X + 200, bg.Position.Y + 200)
 end)
 
 -- Проверка ключа
@@ -119,7 +122,7 @@ local function checkKey()
     end
 end
 
--- Ввод с клавиатуры и мыши
+-- Обработка ввода
 local function onInput(input, gameProcessed)
     if gameProcessed then return end
     if not waitingForKey then return end
@@ -150,7 +153,7 @@ end
 UIS.InputBegan:Connect(onInput)
 repeat task.wait() until not waitingForKey
 
--- ========== ОСНОВНОЙ СКРИПТ (ESP, CHAMS, XRAY, FREECAM) ==========
+-- ========== ОСНОВНАЯ ЧАСТЬ (ESP, CHAMS, XRAY, FREECAM) ==========
 local Menu = { Open = false }
 local MenuTitle = Drawing.new("Text")
 MenuTitle.Position = Vector2.new(20,40)
@@ -214,7 +217,7 @@ local LastESPUpdate = 0
 local ESP_UPDATE_INTERVAL = 0.033
 local FreecamPos = Camera.CFrame.Position
 
--- Weapon detection
+-- Weapon detection (сокращено для читаемости)
 local WeaponCache = setmetatable({}, {__mode = "k"})
 local WeaponTimeCache = setmetatable({}, {__mode = "k"})
 local WeaponParts = {
