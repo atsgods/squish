@@ -23,7 +23,7 @@ pcall(function()
     setreadonly(mt, true)
 end)
 
--- ========== KEY CHECK ЧЕРЕЗ DRAWING (надёжно) ==========
+-- ========== KEY CHECK ЧЕРЕЗ DRAWING (исправлен регистр) ==========
 local inputString = ""
 local waitingForKey = true
 
@@ -79,7 +79,7 @@ Camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
     errorMsg.Position = Vector2.new(bg.Position.X + 200, bg.Position.Y + 115)
 end)
 
--- Обработка ввода
+-- Обработка ввода (исправлен регистр)
 local function onInput(input, gameProcessed)
     if gameProcessed then return end
     if not waitingForKey then return end
@@ -112,9 +112,10 @@ local function onInput(input, gameProcessed)
             inputString = inputString:sub(1, -2)
             inputText.Text = string.rep("*", #inputString)
         else
-            local char = input.KeyCode.Name
+            local char = key.Name
+            -- Разрешаем только буквы и цифры, и сразу приводим к нижнему регистру
             if #char == 1 and char:match("[a-zA-Z0-9]") then
-                inputString = inputString .. char
+                inputString = inputString .. char:lower()
                 inputText.Text = string.rep("*", #inputString)
             end
         end
