@@ -1,4 +1,4 @@
--- blazzed | Trident Survival V5 - Ключ: atsgey (с кнопкой и отображением текста)
+-- blazzed | Trident Survival V5 - Ключ: atsgey (исправленный)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
@@ -23,14 +23,14 @@ pcall(function()
     setreadonly(mt, true)
 end)
 
--- ========== КЛЮЧЕВАЯ ЗАЩИТА (DRAWING) ==========
+-- ========== КЛЮЧЕВАЯ ЗАЩИТА (ИСПРАВЛЕННАЯ) ==========
 local inputString = ""
 local waitingForKey = true
 
 -- Фон
 local bg = Drawing.new("Square")
-bg.Size = Vector2.new(400, 180)
-bg.Position = Vector2.new((Camera.ViewportSize.X - 400) / 2, (Camera.ViewportSize.Y - 180) / 2)
+bg.Size = Vector2.new(400, 200)
+bg.Position = Vector2.new((Camera.ViewportSize.X - 400) / 2, (Camera.ViewportSize.Y - 200) / 2)
 bg.Color = Color3.fromRGB(20, 20, 30)
 bg.Filled = true
 bg.Thickness = 0
@@ -41,7 +41,7 @@ local title = Drawing.new("Text")
 title.Text = "Введите ключ доступа"
 title.Size = 20
 title.Color = Color3.fromRGB(255, 255, 255)
-title.Position = Vector2.new(bg.Position.X + 200, bg.Position.Y + 25)
+title.Position = Vector2.new(bg.Position.X + 200, bg.Position.Y + 30)
 title.Center = true
 title.Outline = true
 title.Visible = true
@@ -49,7 +49,7 @@ title.Visible = true
 -- Поле ввода (фон)
 local inputFieldBg = Drawing.new("Square")
 inputFieldBg.Size = Vector2.new(300, 40)
-inputFieldBg.Position = Vector2.new(bg.Position.X + 50, bg.Position.Y + 55)
+inputFieldBg.Position = Vector2.new(bg.Position.X + 50, bg.Position.Y + 70)
 inputFieldBg.Color = Color3.fromRGB(50, 50, 60)
 inputFieldBg.Filled = true
 inputFieldBg.Thickness = 1
@@ -65,10 +65,10 @@ inputText.Center = false
 inputText.Outline = false
 inputText.Visible = true
 
--- Кнопка "Войти"
+-- Кнопка "Войти" (центрированная)
 local buttonBg = Drawing.new("Square")
-buttonBg.Size = Vector2.new(120, 35)
-buttonBg.Position = Vector2.new(bg.Position.X + 140, bg.Position.Y + 110)
+buttonBg.Size = Vector2.new(140, 40)
+buttonBg.Position = Vector2.new(bg.Position.X + (400 - 140) / 2, bg.Position.Y + 130)
 buttonBg.Color = Color3.fromRGB(0, 120, 255)
 buttonBg.Filled = true
 buttonBg.Thickness = 0
@@ -76,44 +76,43 @@ buttonBg.Visible = true
 
 local buttonText = Drawing.new("Text")
 buttonText.Text = "Войти"
-buttonText.Size = 16
+buttonText.Size = 18
 buttonText.Color = Color3.fromRGB(255, 255, 255)
-buttonText.Position = Vector2.new(buttonBg.Position.X + 60, buttonBg.Position.Y + 17)
+buttonText.Position = Vector2.new(buttonBg.Position.X + 70, buttonBg.Position.Y + 20)
 buttonText.Center = true
 buttonText.Outline = false
 buttonText.Visible = true
 
--- Сообщение об ошибке
+-- Сообщение об ошибке (без указания правильного ключа)
 local errorMsg = Drawing.new("Text")
 errorMsg.Text = ""
-errorMsg.Size = 13
+errorMsg.Size = 14
 errorMsg.Color = Color3.fromRGB(255, 80, 80)
-errorMsg.Position = Vector2.new(bg.Position.X + 200, bg.Position.Y + 160)
+errorMsg.Position = Vector2.new(bg.Position.X + 200, bg.Position.Y + 185)
 errorMsg.Center = true
 errorMsg.Visible = true
 
--- Обновление позиций при изменении размера окна
+-- Обновление позиций
 Camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
-    bg.Position = Vector2.new((Camera.ViewportSize.X - 400) / 2, (Camera.ViewportSize.Y - 180) / 2)
-    title.Position = Vector2.new(bg.Position.X + 200, bg.Position.Y + 25)
-    inputFieldBg.Position = Vector2.new(bg.Position.X + 50, bg.Position.Y + 55)
+    bg.Position = Vector2.new((Camera.ViewportSize.X - 400) / 2, (Camera.ViewportSize.Y - 200) / 2)
+    title.Position = Vector2.new(bg.Position.X + 200, bg.Position.Y + 30)
+    inputFieldBg.Position = Vector2.new(bg.Position.X + 50, bg.Position.Y + 70)
     inputText.Position = Vector2.new(inputFieldBg.Position.X + 10, inputFieldBg.Position.Y + 8)
-    buttonBg.Position = Vector2.new(bg.Position.X + 140, bg.Position.Y + 110)
-    buttonText.Position = Vector2.new(buttonBg.Position.X + 60, buttonBg.Position.Y + 17)
-    errorMsg.Position = Vector2.new(bg.Position.X + 200, bg.Position.Y + 160)
+    buttonBg.Position = Vector2.new(bg.Position.X + (400 - 140) / 2, bg.Position.Y + 130)
+    buttonText.Position = Vector2.new(buttonBg.Position.X + 70, buttonBg.Position.Y + 20)
+    errorMsg.Position = Vector2.new(bg.Position.X + 200, bg.Position.Y + 185)
 end)
 
--- Функция проверки ключа
+-- Функция проверки ключа (без вывода ожидаемого ключа)
 local function checkKey()
     if inputString == "atsgey" then
         waitingForKey = false
-        -- Удаляем все элементы интерфейса
         for _, obj in pairs({bg, title, inputFieldBg, inputText, buttonBg, buttonText, errorMsg}) do
             obj.Visible = false
             obj:Remove()
         end
     else
-        errorMsg.Text = "Неверный ключ! Введено: " .. inputString .. ". Ожидается: atsgey"
+        errorMsg.Text = "Неверный ключ! Попробуйте снова."
         inputString = ""
         inputText.Text = ""
         task.wait(2)
@@ -121,7 +120,7 @@ local function checkKey()
     end
 end
 
--- Обработка ввода с клавиатуры и мыши
+-- Обработка ввода
 local function onInput(input, gameProcessed)
     if gameProcessed then return end
     if not waitingForKey then return end
@@ -150,8 +149,6 @@ local function onInput(input, gameProcessed)
 end
 
 UIS.InputBegan:Connect(onInput)
-
--- Ждём правильного ключа
 repeat task.wait() until not waitingForKey
 
 -- ========== ОСНОВНАЯ ЧАСТЬ (ESP, CHAMS, XRAY, FREECAM) ==========
